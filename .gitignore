@@ -15,6 +15,10 @@ coverage/
 .coverage*
 *.lcov
 frontend/.env.local
+.vercel/
 .vscode/
 .idea/
 .DS_Store
+
+.vercel
+.env*

@@ -1,0 +1,82 @@
+import {useEffect, useMemo, useRef, useState} from 'react'
+import PlannerForm from './components/PlannerForm.jsx'
+import MapView from './components/MapView.jsx'
+import RouteCard from './components/RouteCard.jsx'
+import {planRoute} from './api.js'
+import {buildCheckpointGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
+import {createRequestGate} from './requestGate.js'
+
+const weatherValue=(value,digits=1)=>value==null?'—':Number(value).toFixed(digits)
+
+export default function App(){
+ const [plan,setPlan]=useState(null)
+ const [selected,setSelected]=useState(null)
+ const [loading,setLoading]=useState(false)
+ const [error,setError]=useState('')
+ const [forecastHour,setForecastHour]=useState(0)
+ const requestGate=useRef(null)
+ if(!requestGate.current)requestGate.current=createRequestGate()
+ useEffect(()=>()=>requestGate.current?.cancel(),[])
+ const routes=plan?.routes||[]
+ const selectedForecastTimestamp=plan?getSelectedForecastTimestamp(plan.departure_time,forecastHour):null
+ const selectedForecastGeoJSON=plan?buildCheckpointGeoJSON(routes,plan.departure_time,forecastHour,{selectedRouteId:selected,includeAlternatives:true}):null
+ const active=useMemo(()=>routes.find(route=>route.id===selected)||routes.find(route=>route.recommended)||routes[0],[routes,selected])
+ const routeSummaries=new Map((plan?.route_summaries||[]).map(summary=>[summary.route_id,summary]))
+
+ async function submit(payload){
+   const request=requestGate.current.start()
+   setLoading(true);setError('');setPlan(null);setSelected(null);setForecastHour(0)
+  try{
+   const result=await planRoute(payload,request.signal)
+   if(!requestGate.current.isCurrent(request))return
+   setPlan(result)
+   setSelected(result.recommended_route_id||result.routes?.[0]?.id||null)
+  }catch(exception){
+   if(!requestGate.current.isCurrent(request))return
+   const data=exception.response?.data
+   const details=data?.details?JSON.stringify(data.details):''
+   setError(data?.error||details||exception.message||'Unable to analyze this journey. Please try again.')
+  }finally{if(requestGate.current.finish(request))setLoading(false)}
+ }
+
+ return <main className="app-shell dashboard-shell">
+  <header className="topbar">
+   <a className="brand" href="#top" aria-label="WeatherRoute home"><span className="brand-mark">W</span><span>weather<span className="brand-accent">route</span></span></a>
+   <div className="topbar-right"><span className="live-dot"/>Weather-aware freight planning</div>
+  </header>
+
+  <section className="hero dashboard-hero" id="top">
+   <div><div className="eyebrow">JOURNEY PLANNING · WEATHER INTELLIGENCE</div><h1>Plan the route.<br/><em>Know the risk.</em></h1><p>Compare real driving alternatives with forecast conditions along each journey.</p></div>
+   <div className="hero-promise"><span className="promise-mark">✳</span><div><b>Plan with confidence</b><small>Live routes · Arrival-time forecasts<br/>Risk-aware recommendations</small></div></div>
+  </section>
+
+  <section className="planner-panel">
+   <div className="panel-heading"><div><span className="section-kicker">JOURNEY DETAILS</span><h2>Build your trip</h2></div><span className="step-tag">UP TO 3 ALTERNATIVES</span></div>
+   <PlannerForm onSubmit={submit} loading={loading}/>
+  </section>
+
+  {error&&<div className="error-box dashboard-error" role="alert"><span className="error-symbol">!</span><div><b>We couldn't analyze this journey</b><p>{error}</p></div></div>}
+  {loading&&<div className="loading-state" role="status"><span className="loading-orbit"/><div><b>Analyzing your journey</b><span>Finding alternatives and matching checkpoint forecasts to arrival times…</span></div></div>}
+
+  {plan&&<>
+   <section className="route-results">
+    <div className="results-heading"><div><span className="section-kicker">ROUTE ANALYSIS</span><h2>{routes.length?`Compare ${routes.length} route${routes.length===1?'':'s'}`:'No route alternatives returned'}</h2><p>{routes.length?'Choose a route to inspect its path and checkpoint conditions.':'Try adjusting the locations or departure details and analyze again.'}</p></div><div className="results-total"><strong>{routes.length}</strong><span>available<br/>alternative{routes.length===1?'':'s'}</span></div></div>
+    {routes.length>0&&<div className="comparison-grid">{routes.map(route=><RouteCard key={route.id} route={route} summary={routeSummaries.get(route.id)} departureTime={plan.departure_time} active={active?.id===route.id} onClick={()=>setSelected(route.id)}/>)}</div>}
+    <div className={`recommendation result-recommendation ${plan.recommended_route_id?'':'unsafe'}`}><span className="rec-icon">{plan.recommended_route_id?'✦':'!'}</span><div><b>{plan.recommended_route_id?'Recommended route':'No safe route available'}</b><p>{plan.ranking_explanation||plan.recommendation?.reason}</p></div></div>
+   </section>
+
+   {routes.length>0&&<section className="analysis-layout">
+    <div className="map-panel"><div className="map-toolbar"><div className="map-label"><span className="map-pin">⌖</span><div><b>{active?`${plan.origin.label.split(',')[0]} → ${plan.destination.label.split(',')[0]}`:'Route overview'}</b><small>{active?`${active.distance_miles.toLocaleString()} miles · ${active.duration_hours} hours`:'Select a route to inspect its map'}</small></div></div><div className="legend"><span><i className="dot low"/>Low</span><span><i className="dot moderate"/>Moderate</span><span><i className="dot high"/>High</span><span><i className="dot severe"/>Severe</span><span><i className="dot no-travel"/>No travel</span></div></div>
+     {plan.routing_notice&&<div className="routing-notice">ⓘ {plan.routing_notice}</div>}
+     <div className="map-wrap"><MapView routes={routes} selectedRouteId={active?.id} recommendedRouteId={plan.recommended_route_id} forecastHour={forecastHour} departureTime={plan.departure_time} origin={plan.origin} destination={plan.destination}/></div>
+     <div className="forecast-bar"><div className="forecast-title"><span className="forecast-icon">◷</span><div><b>Forecast exploration</b><small>Exploration time is separate from checkpoint ETA</small></div></div><div className="slider-wrap"><input aria-label="Forecast hour" aria-valuetext={selectedForecastTimestamp?formatForecastTimestamp(selectedForecastTimestamp):'Forecast unavailable'} type="range" min="0" max="48" step="1" value={forecastHour} onChange={event=>setForecastHour(Number(event.target.value))}/><div className="slider-ticks"><span>Depart</span><span>12h</span><span>24h</span><span>36h</span><span>48h</span></div><div className="selected-forecast-time"><b>{formatForecastTimestamp(selectedForecastTimestamp)}</b><span>{selectedForecastGeoJSON?.features.length?`${selectedForecastGeoJSON.features.length} checkpoint forecast${selectedForecastGeoJSON.features.length===1?'':'s'} available`:'No checkpoint forecasts available for this time'}</span></div></div><div className="forecast-value">+{forecastHour}<small>hours</small></div></div>
+    </div>
+    <aside className="checkpoint-panel"><div className="checkpoint-panel-heading"><span className="section-kicker">ON THE WAY</span><h3>Checkpoint outlook</h3><p>{active?`${active.checkpoints.length} forecast checkpoints`:'Select a route'}</p></div>{active&&<div className="checkpoint-list dashboard-checkpoints">{active.checkpoints.map(point=><div className="checkpoint weather-checkpoint" key={point.id||point.index}><div className="checkpoint-top"><i className={`dot ${point.risk.level}`}/><span>{point.distance_miles} mi</span><b>{point.risk.score??'—'}</b></div><small>Wind {weatherValue(point.weather?.wind_speed_mph)} mph<br/>Rain {weatherValue(point.weather?.rain_inches_per_hour,3)} in/hr · Snow {weatherValue(point.weather?.snowfall_inches_per_hour,3)} in/hr</small></div>)}</div>}</aside>
+   </section>}
+  </>}
+
+  {!plan&&!loading&&!error&&<section className="dashboard-empty"><div className="empty-orbit">⌖</div><span className="section-kicker">READY WHEN YOU ARE</span><h2>Your next journey starts here</h2><p>Enter an origin, destination and departure details above to compare real routes and weather exposure.</p><div className="empty-features"><span>↗ Real route alternatives</span><span>◷ Arrival-time forecasts</span><span>✳ Checkpoint risk analysis</span></div></section>}
+
+  <footer><span>WeatherRoute <i>·</i> Plan smarter. Drive safer.</span><span>Forecasts are estimates and do not replace official road advisories.</span></footer>
+ </main>
+}

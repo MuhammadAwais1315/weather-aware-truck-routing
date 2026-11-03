@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { buildCheckpointGeoJSON } from '../forecast.js'
+
+// Vite must emit MapLibre's module worker as a first-class asset. Without this,
+// its default relative URL points at a dependency file that Vercel does not serve.
+maplibregl.setWorkerUrl(mapLibreWorkerUrl)
 
 const ROUTE_COLORS = ['#258b65', '#3978c5', '#8b5fc7']
 const SOURCE_IDS = ['route-lines', 'weather-checkpoints', 'journey-endpoints']
@@ -103,7 +108,7 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
       instance.addLayer({ id: 'checkpoint-heat', type: 'heatmap', source: 'weather-checkpoints', maxzoom: 10, layout: { visibility: 'none' }, paint: { 'heatmap-weight': ['get', 'riskWeight'], 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 9, 2], 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 10, 9, 28], 'heatmap-opacity': 0.68, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(34,160,107,0)', 0.15, '#eab308', 0.4, '#f97316', 0.7, '#dc2626', 1, '#7f1d1d'] } })
       instance.addLayer({ id: 'checkpoint-dots', type: 'circle', source: 'weather-checkpoints', layout: { visibility: 'visible' }, paint: { 'circle-radius': 6, 'circle-color': ['match', ['get', 'riskLevel'], 'no_travel', '#7f1d1d', 'severe', '#dc2626', 'high', '#f97316', 'moderate', '#eab308', 'low', '#22a06b', '#94a3b8'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': 0.98 } })
       instance.addLayer({ id: 'endpoint-dots', type: 'circle', source: 'journey-endpoints', paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } })
-      instance.addLayer({ id: 'endpoint-labels', type: 'symbol', source: 'journey-endpoints', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-allow-overlap': true }, paint: { 'text-color': '#20312b', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } })
+      instance.addLayer({ id: 'endpoint-labels', type: 'symbol', source: 'journey-endpoints', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold'], 'text-size': 11, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-allow-overlap': true }, paint: { 'text-color': '#20312b', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } })
       instance.on('click', 'checkpoint-dots', onCheckpointClick)
       instance.on('mouseenter', 'checkpoint-dots', () => { instance.getCanvas().style.cursor = 'pointer' })
       instance.on('mouseleave', 'checkpoint-dots', () => { instance.getCanvas().style.cursor = '' })
@@ -173,3 +178,4 @@ function updateMap(map, data, shouldFit) {
     if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: { top: 74, right: 62, bottom: 50, left: 62 }, maxZoom: 11, duration: 0 })
   }
 }
+

@@ -10,24 +10,24 @@
 
 | Area | Result |
 |---|---|
-| Django tests | **101 passed**, 0 failed, 0 skipped |
+| Django tests | **104 passed**, 0 failed, 0 skipped |
 | React/Vitest tests | **29 passed**, 0 failed, 0 skipped |
 | Playwright browser tests | **4 passed**, 0 failed, 0 skipped |
-| Total automated tests | **134 passed**, 0 failed, 0 skipped |
+| Total automated tests | **137 passed**, 0 failed, 0 skipped |
 | Production frontend build | Passed; Vite reports a large JavaScript chunk warning |
-| Public Vercel frontend | Page and React form returned HTTP 200; JavaScript bundle returned HTTP 200; Edge smoke had 0 page/console errors |
+| Public Vercel frontend | Page and React form returned HTTP 200; live journey succeeded; Edge smoke had 0 page errors, console errors or failed HTTP responses |
 | Public Vercel backend | Django deployed; `/api/health/` returned HTTP 200 JSON with status `ok` and version `1.0.0` |
 | Production CORS | Preflight from the deployed frontend origin returned HTTP 200 and `Access-Control-Allow-Origin` matched exactly |
 | Public frontend-to-backend request | Edge browser fetched backend health successfully from the production dashboard; no uncaught page errors |
-| Public journey submission | Form submitted to production API and displayed its actual HTTP 503 error: `OPENROUTESERVICE_API_KEY is not configured.` Route analysis is blocked until the key is added |
-| Public full route workflow | **Not verified**: API URL and CORS are configured, but ORS credentials are absent, so no real alternatives/checkpoints/map workflow is available publicly |
+| Public journey submission | New York to Boston returned HTTP 200 with one provider route, six checkpoints, weather at all six, recommendation `route-1`, and route summary |
+| Public full route workflow | Verified in Edge: form → live backend analysis → route card/recommendation → map canvas and worker → forecast slider. No console or HTTP errors. This 219.2-mile trip returned one route due to the provider's 100 km alternative calculation limit |
 | Live Nominatim geocoding | Passed |
 | Live Open-Meteo hourly forecast | Passed, including requested units and UTC timestamp matching |
-| Live complete plan request | **Blocked**: `OPENROUTESERVICE_API_KEY` is not configured; backend correctly returned HTTP 503 |
+| Live complete plan request | Passed with configured production key; the 50-mile checkpoint interval returned 6/6 checkpoints with forecast weather |
 
-Automated test counts above are actual executed results. The 134 tests use mocked provider responses where necessary. Provider-specific smoke requests for Nominatim and Open-Meteo were live. The route dependent workflow cannot be proven end-to-end against providers until a valid routing key is supplied; no route data was fabricated.
+Automated test counts above are actual executed results. The 137 tests use mocked provider responses where necessary. Provider-specific Nominatim and Open-Meteo requests and the complete public route workflow were live. The long trip returned one actual route because openrouteservice limits alternative calculations to trips under 100 km; no route data was fabricated.
 
-After the deployment-preparation changes, the backend suite was rerun under Coverage.py: 101 tests passed and aggregate measured coverage was **85.0% with branch measurement** (856 statements, 274 branches). Frontend tests do not currently have a coverage provider, so a frontend coverage percentage is unavailable. See [TESTING.md](TESTING.md).
+The backend suite last completed with 104 passing tests. The earlier Coverage.py run measured 85.0% branch coverage at 101 tests; coverage was not recalculated after the latest three backend regression tests. Frontend tests do not currently have a coverage provider, so a frontend coverage percentage is unavailable. See [TESTING.md](TESTING.md).
 
 ## Scenario results
 
@@ -39,10 +39,10 @@ After the deployment-preparation changes, the backend suite was rerun under Cove
 | Enter and submit journey | Form accepts origin, destination, departure, weight, interval and sends analysis request | Browser live smoke filled and submitted the journey; backend received `POST /api/plan/` | **PASS** (submission); analysis below is blocked |
 | Live origin/destination geocoding | Nominatim returns real coordinates for valid address | Live New York query returned label `New York, United States`, latitude `40.7127281`, longitude `-74.0060152` | **PASS** |
 | Invalid geocoding input | Invalid/short input returns a structured client error | Covered by Django geocoding/API tests; discovered error formatting defect was fixed and regression tested | **PASS** (automated) |
-| Request three route alternatives | ORS request asks for up to three alternatives and returns provider results only | Request behavior and 1-, 2-, and 3-route response cases verified with mocked ORS responses. Live route request could not execute because key is absent | **PASS** (mocked); **BLOCKED** (live) |
-| Display actual route alternatives | Actual returned geometries appear in comparison UI/map | Playwright validates route cards/map from API fixtures. Live plan returned HTTP 503, so no actual provider route geometry was available | **PASS** (mocked UI); **BLOCKED** (live) |
+| Request up to three route alternatives | ORS request asks for up to three alternatives and returns provider results only | Mocked tests cover 1/2/3 results. Live 219.2-mile plan returned one actual provider route; API notice explains the 100 km alternatives limit | **PASS** (tests and live fallback) |
+| Display returned route geometry | Actual returned geometry appears in comparison UI/map | Production Edge journey displayed one actual route, route summary/recommendation, map canvas and emitted MapLibre worker. No HTTP, console, or failed-request errors | **PASS** |
 | Checkpoints at 10, 25 and 50 miles | Checkpoints follow cumulative route distance and contain start/destination once | Each interval, short/long routes, interpolation, distance, ETA and endpoint uniqueness covered by backend tests; intervals also exercised through browser fixtures | **PASS** (automated) |
-| Checkpoint weather uses ETA | Weather lookup time corresponds to each checkpoint’s estimated arrival | Weather timestamp matching, timezone behavior and trip-analysis integration are covered by mocked backend tests. No live route meant no live checkpoint ETA to query | **PASS** (automated); **BLOCKED** (live route flow) |
+| Checkpoint weather uses ETA | Weather lookup time corresponds to each checkpoint’s estimated arrival | Backend tests cover forecast-hour matching/timezones; production plan returned six checkpoints and weather for all six | **PASS** |
 | Live weather retrieval and units | Open-Meteo hourly data matches requested hour and is converted to mph and inches/hour | Live query at New York coordinates matched requested `2026-11-03T10:00Z`; wind `4.722421 mph`, rain `0.0 in/hour`, snow `0.0 in/hour`; provider returned forecast available | **PASS** |
 | Missing/null/unavailable forecast | Missing data remains missing and does not become zero | Null values, unavailable hours, API failures, timeouts and cache behavior covered with mocked responses | **PASS** (automated) |
 | Risk thresholds and load overrides | Wind/rain/snow boundaries and heavy-load overrides follow configured rules | Boundary tests cover every listed cutoff and load override; missing weather handled explicitly | **PASS** (automated) |
@@ -54,9 +54,8 @@ After the deployment-preparation changes, the backend suite was rerun under Cove
 | Heatmap and 0–48-hour slider | Slider updates exploratory forecast time, heatmap and checkpoint visualization without changing trip ETA | Browser and frontend tests cover slider calculations, forecast timestamp selection, GeoJSON updates and missing hours | **PASS** (automated) |
 | API failure/loading states | Clear loading and error behavior; stale results removed after failed/repeated submission | Playwright tests cover failure/loading UI and second submission removing old cards/map state | **PASS** (automated) |
 | Responsive layout | Dashboard fits mobile, tablet and desktop | Playwright viewport checks passed at mobile, tablet and desktop sizes without horizontal overflow | **PASS** (automated) |
-| Live plan endpoint with missing routing key | Useful failure response and visible user-facing error; no fabricated routes | `POST /api/plan/` returned HTTP 503, code `routing_not_configured`; UI showed the error, and route count remained zero | **PASS** (failure handling); live analysis **BLOCKED** |
-| Browser console and failed requests | No uncaught page errors, missing assets, or unexpected failed requests | After removing blocked external font import and adding favicon, live smoke had 0 page errors and 0 failed requests; only expected plan HTTP 503 was logged as a console network error | **PASS** with expected API failure |
-| Backend logs / Django checks | No startup/system-check errors; requests logged with useful status | Django system check reported no issues. Health/geocode/CORS were 200; missing ORS configuration was logged as 503. Test logs contain expected mocked timeout and exception-handler cases | **PASS** |
+| Browser console and failed requests | No uncaught page errors, missing assets, or unexpected failed requests | Production initially revealed a missing MapLibre worker asset and invalid demo glyph stack. The worker is now emitted by Vite, the font stack matches the style; latest live smoke had 0 console errors and 0 HTTP failures | **PASS** |
+| Backend logs / Django checks | No startup/system-check errors; requests logged with useful status | Django system check reported no issues. Production health, autocomplete and plan requests succeeded; test logs contain expected mocked timeout and exception-handler cases | **PASS** |
 
 ## Fixes made during QA
 
@@ -64,14 +63,15 @@ After the deployment-preparation changes, the backend suite was rerun under Cove
 - Fixed central exception handling for non-field DRF validation errors so the API returns a readable message instead of a Python `ErrorDetail` representation. Added a regression test.
 - Removed a remote Google Fonts import that produced a browser network error in this environment, and added a local SVG favicon to eliminate the `/favicon.ico` 404.
 - Added `frontend/scripts/live-smoke.mjs` and the `npm run qa:live` command to fill and submit the real dashboard against the running API while capturing browser and HTTP errors.
+- Bundled MapLibre's module worker with Vite and set the emitted URL explicitly; fixed the map label font to use a font stack provided by the selected map style.
 
 ## Build and operational notes
 
 - `npm run build` completed successfully. Vite emitted a warning that the minified JavaScript bundle is about 1.39 MB (397 KB gzip), above its 500 KB advisory threshold. This does not fail the build, but code splitting would improve load performance.
 - Django logs report 14 unapplied built-in `auth` and `contenttypes` migrations. Current endpoints and tests work without database-backed models, but run migrations before adding database-dependent behavior.
 - The local backend uses Django’s development server; it is suitable for this QA session only.
-- The live smoke command intentionally exits nonzero when a planning request fails. Here that accurately exposed the missing routing credential rather than treating the blocked integration as success.
+- The long public trip is not eligible for ORS alternative-route calculations, so one actual route is expected. For trips under 100 km, provider availability and request limits determine whether ORS returns additional alternatives.
 
-## Live test prerequisite to complete the blocked scenarios
+## Remaining live checks
 
-Set a valid `OPENROUTESERVICE_API_KEY` in `backend/.env`, restart/reload Django, then rerun `npm run qa:live` and submit journeys for each checkpoint interval. This is required to validate real ORS geometries, live-route checkpoint/weather association, and the resulting actual-data map/heatmap workflow. No credentials are included in this report.
+The public 50-mile interval journey is verified. To validate all intervals with provider data, repeat the public journey at 10 and 25 miles. A short route under 100 km is needed to exercise multiple live ORS alternatives. Forecast slider interaction and heatmap data updates are covered by the automated UI suite; all API secrets remain in Vercel environment configuration and are not included in this report.

@@ -179,7 +179,7 @@ Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate o
 
 ## Deployment preparation
 
-The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. Both the [React frontend](https://weather-aware-truck-routing-psi.vercel.app/) and [Django API](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/) are deployed to Vercel. The frontend's public page, React form, cross-origin health request and API error handling were checked in Edge. **The full journey is not yet verified:** the production plan request returns HTTP 503 because `OPENROUTESERVICE_API_KEY` has not been configured. Do not present this as successful route analysis until a key is added and a real journey completes.
+The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. Both the [React frontend](https://weather-aware-truck-routing-psi.vercel.app/) and [Django API](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/) are deployed to Vercel. The OpenRouteService production key is configured as a Vercel secret. A real New York-to-Boston journey completed in the public dashboard: the API returned one provider route, six ETA-based checkpoints with weather, a recommendation, route geometry and the map rendered without browser console or HTTP errors. The trip exceeds openrouteservice's 100 km alternative-route limit, so its API returned only one actual route; the application explains this limit and does not fabricate alternatives.
 
 ### Render backend (alternative)
 
@@ -189,7 +189,7 @@ The app currently has no user/account or durable business data, so no production
 
 ### Vercel backend
 
-The Vercel API project `weather-aware-truck-routing-api` is rooted at `backend/`, where [`backend/vercel.json`](backend/vercel.json) sets a 180-second function duration and excludes test/cache files. Vercel detects Django from `manage.py`, and Python 3.12 is declared in `backend/.python-version`. Production has `DEBUG=False`, a generated secret, and an exact CORS allow-origin for the frontend. The runtime derives its deployment host from Vercel system variables. The deployed API health check returns `{"status":"ok","version":"1.0.0"}`. Add `OPENROUTESERVICE_API_KEY` in the backend project's Vercel Production environment to enable autocomplete and real alternatives. The local `render.yaml` remains an alternative backend host configuration.
+The Vercel API project `weather-aware-truck-routing-api` is rooted at `backend/`, where [`backend/vercel.json`](backend/vercel.json) sets a 180-second function duration and excludes test/cache files. Vercel detects Django from `manage.py`, and Python 3.12 is declared in `backend/.python-version`. Production has `DEBUG=False`, a generated secret, an exact CORS allow-origin for the frontend, and `OPENROUTESERVICE_API_KEY` set as a secret. The runtime derives its deployment host from Vercel system variables. The deployed API health check returns `{"status":"ok","version":"1.0.0"}`. The local `render.yaml` remains an alternative backend host configuration.
 
 ### Vercel frontend
 
@@ -197,20 +197,20 @@ The Vercel frontend project `weather-aware-truck-routing` is rooted at `frontend
 
 ### Production verification checklist
 
-The current production health/browser-CORS checks have passed. After adding an ORS key, verify a complete journey in a browser and from PowerShell:
+Production health, CORS, and a complete browser journey have been verified. A New York-to-Boston production request returned one actual route (the trip is over the provider's 100 km alternatives limit), 6/6 checkpoints with weather, recommendation `route-1`, and a rendered MapLibre canvas. The MapLibre worker loads from a Vite-emitted asset and the browser check reported no console or HTTP errors. Recheck the public API and UI with:
 
 ```powershell
 Invoke-RestMethod https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/
 Invoke-WebRequest https://weather-aware-truck-routing-psi.vercel.app/
 ```
 
-Then submit a journey with each checkpoint interval (10, 25, 50), confirm the browser network panel shows the production `POST /api/plan/` succeeding, and inspect actual ORS route counts, geometries, checkpoint ETA/weather, risk/ranking, route layers/popups, and heatmap slider at several hours. Test a deliberately invalid/unavailable route request and missing forecast hour. Check Vercel logs and browser console for unexpected failures. A successful health check alone does not verify the workflow; only mark the full application verified after these public checks succeed.
+The current live browser verification used interval 50; intervals 10, 25 and 50 are covered by backend and frontend automated tests. The Playwright UI suite covers route rendering, checkpoints/popups, forecast slider changes, loading/errors, repeat submissions and responsive widths. For further live checks, inspect ORS geometry/count, checkpoint ETA/weather, route layers, popups and heatmap at several forecast offsets; test missing forecasts and unavailable routes. A successful health check alone does not verify the workflow.
 
 Deployment format follows [Vercel's Django guide](https://vercel.com/docs/frameworks/full-stack/django), [Vercel Vite guidance](https://vercel.com/docs/frameworks/frontend/vite), and the [Render Django deployment guide](https://render.com/docs/deploy-django). See also [Render Blueprint environment variables](https://render.com/docs/blueprint-spec) and [Vercel environment variables](https://vercel.com/docs/environment-variables).
 
 ## Known limitations and risks
 
-- Real ORS alternatives require an active key, quota and provider availability. The public backend currently returns `routing_not_configured` (HTTP 503) until a key is added; no routes are fabricated.
+- Real ORS routes and alternatives require an active key, quota and provider availability. ORS alternative-route calculations are limited to trips under 100 km; for longer trips the backend retries once without the alternatives option and returns only the provider's actual route, with an explanatory notice. It does not fabricate alternatives.
 - HGV profile results are not regulatory clearance; height, axle, weight and road restrictions can be incomplete or missing.
 - Open-Meteo horizon is limited (the service requests seven forecast days). Forecasts beyond available hourly data are reported unavailable; no weather is invented. The 0–48h slider only visualizes forecast observations within its matching window.
 - The planner fetches weather per checkpoint sequentially. A long route at a 10-mile spacing can create many upstream calls and a long request. Provider quotas, rate limiting and deployment request-duration limits apply.

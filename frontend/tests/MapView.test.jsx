@@ -6,7 +6,7 @@ import {makePlan} from './fixtures.js'
 
 vi.mock('maplibre-gl', async () => {
   const mock = await import('./mocks/maplibre.js')
-  return {Map: mock.FakeMap, Popup: mock.FakePopup, LngLatBounds: mock.FakeLngLatBounds, NavigationControl: mock.FakeNavigationControl}
+  return {Map: mock.FakeMap, Popup: mock.FakePopup, LngLatBounds: mock.FakeLngLatBounds, NavigationControl: mock.FakeNavigationControl, setWorkerUrl: vi.fn()}
 })
 
 const basePlan = makePlan()

@@ -71,3 +71,27 @@ class PlanPipelineTests(SimpleTestCase):
         self.assertEqual(plan['routes'], [])
         self.assertIsNone(plan['recommended_route_id'])
         self.assertIn('No safe route available', plan['ranking_explanation'])
+
+    def test_provider_alternative_limit_is_disclosed_in_routing_notice(self):
+        route = {
+            'id': 'route-1', 'name': 'Route 1',
+            'geometry': {'type': 'LineString', 'coordinates': [[-75, 40], [-74, 41]]},
+            'distance_meters': 160934.4, 'duration_seconds': 7200,
+            'alternatives_note': 'OpenRouteService limits alternatives to under 100 km. One actual route was returned.',
+        }
+        with patch('apps.routing.planning.geocode_place', side_effect=[
+            {'label': 'A', 'latitude': 40, 'longitude': -75},
+            {'label': 'B', 'latitude': 41, 'longitude': -74},
+        ]), patch('apps.routing.planning.openrouteservice_client.get_routes', return_value=[route]), \
+                patch('apps.routing.planning.get_weather', return_value={
+                    'available': True, 'wind_speed_mph': 10,
+                    'rain_inches_per_hour': 0, 'snowfall_inches_per_hour': 0,
+                }):
+            plan = build_plan({
+                'origin': 'A', 'destination': 'B',
+                'departure_time': datetime(2026, 11, 3, 14, tzinfo=timezone.utc),
+                'load_weight_tons': 1, 'checkpoint_interval_miles': 50,
+            })
+
+        self.assertEqual(len(plan['routes']), 1)
+        self.assertIn('One actual route was returned', plan['routing_notice'])

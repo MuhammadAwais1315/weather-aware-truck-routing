@@ -116,6 +116,36 @@ class OpenRouteServiceClientTests(SimpleTestCase):
                 self.assertGreater(routes[0]['summary']['duration_hours'], 0)
                 self.assertEqual(session.post.call_args.kwargs['json']['alternative_routes']['target_count'], 3)
 
+    def test_long_trip_alternative_limit_retries_for_one_actual_route(self):
+        limit_response = mocked_response({
+            'error': {
+                'code': 2004,
+                'message': 'The approximated route distance must not be greater than 100000.0 meters for use with the alternative Routes algorithm.',
+            },
+        }, status_code=400)
+        session = Mock()
+        session.post.side_effect = [limit_response, mocked_response({'features': [self.feature(0)]})]
+        client = OpenRouteServiceClient(api_key='test-key', session=session)
+
+        routes = client.get_routes(self.origin, self.destination)
+
+        self.assertEqual(len(routes), 1)
+        self.assertEqual(routes[0]['id'], 'route-1')
+        self.assertIn('One actual route', routes[0]['alternatives_note'])
+        self.assertIn('alternative_routes', session.post.call_args_list[0].kwargs['json'])
+        self.assertNotIn('alternative_routes', session.post.call_args_list[1].kwargs['json'])
+        self.assertEqual(session.post.call_count, 2)
+
+    def test_other_directions_400_errors_do_not_retry_without_alternatives(self):
+        session = Mock()
+        session.post.return_value = mocked_response({'error': {'code': 2004, 'message': 'Different invalid request.'}}, status_code=400)
+        client = OpenRouteServiceClient(api_key='test-key', session=session)
+
+        with self.assertRaises(ServiceError):
+            client.get_routes(self.origin, self.destination)
+
+        session.post.assert_called_once()
+
     def test_provider_failure_is_reported(self):
         session = Mock()
         session.post.return_value = mocked_response({}, status_code=500)

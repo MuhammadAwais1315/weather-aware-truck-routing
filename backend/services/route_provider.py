@@ -76,9 +76,25 @@ class OpenRouteServiceClient:
             'alternative_routes': {'target_count': 3, 'weight_factor': 1.6, 'share_factor': 0.6},
             'instructions': True,
         }
+        alternatives_limited_note = None
         try:
             response = self.session.post(url, json=body, headers={'Authorization': self.api_key}, timeout=45)
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except requests.HTTPError as exc:
+                if not self._is_alternative_distance_limit(exc):
+                    self._raise_provider_error(exc, 'OpenRouteService routing failed')
+                # ORS limits its alternative-route algorithm to trips under 100 km.
+                # Retry without alternatives and return the one actual provider route.
+                # This is deliberately not replaced with a synthetic route.
+                body = dict(body)
+                body.pop('alternative_routes', None)
+                alternatives_limited_note = (
+                    'OpenRouteService limits alternative-route calculations to trips under 100 km. '
+                    'One actual route was returned for this longer journey.'
+                )
+                response = self.session.post(url, json=body, headers={'Authorization': self.api_key}, timeout=45)
+                response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict) or not isinstance(payload.get('features', []), list):
                 raise ServiceError('OpenRouteService returned an invalid directions response.', status_code=502, code='routing_invalid_response')
@@ -121,6 +137,8 @@ class OpenRouteServiceClient:
                         'profile': profile,
                     },
                 }
+                if alternatives_limited_note:
+                    route['alternatives_note'] = alternatives_limited_note
                 segment_durations = self._segment_durations(properties, geometry['coordinates'])
                 if segment_durations:
                     route['segment_durations_seconds'] = segment_durations
@@ -227,6 +245,20 @@ class OpenRouteServiceClient:
             raise ServiceError('OpenRouteService rejected the configured API key.', status_code=502, code='invalid_routing_api_key') from exc
         detail = response.text[:300] if response is not None else str(exc)
         raise ServiceError(f'{message}: {detail}') from exc
+
+    @staticmethod
+    def _is_alternative_distance_limit(exc):
+        """Detect the ORS-specific 100 km alternative-route limit response."""
+        response = exc.response
+        if response is None or response.status_code != 400:
+            return False
+        try:
+            payload = response.json()
+            error = payload.get('error', {}) if isinstance(payload, dict) else {}
+            message = str(error.get('message', '')).lower() if isinstance(error, dict) else ''
+            return error.get('code') == 2004 and 'alternative routes algorithm' in message and '100000' in message
+        except (ValueError, TypeError, AttributeError):
+            return False
 
 
 openrouteservice_client = OpenRouteServiceClient()

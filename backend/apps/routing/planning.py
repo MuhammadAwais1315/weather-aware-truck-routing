@@ -43,6 +43,15 @@ def build_plan(payload):
             },
         })
     recommendation = recommend_route(routes)
+    alternatives_notes = list(dict.fromkeys(
+        route['alternatives_note'] for route in routes if route.get('alternatives_note')
+    ))
+    routing_notice = (
+        'Route results use the configured openrouteservice profile but are not a guarantee of compliance '
+        'with truck height, axle-weight, or road restrictions. Verify restrictions before dispatch.'
+    )
+    if alternatives_notes:
+        routing_notice = f"{routing_notice} {' '.join(alternatives_notes)}"
     return {
         'origin': origin, 'destination': destination, 'departure_time': departure.isoformat(),
         'load_weight_tons': load, 'checkpoint_interval_miles': interval,
@@ -51,5 +60,5 @@ def build_plan(payload):
         'ranked_routes': recommendation['ranked_routes'],
         'route_summaries': recommendation['route_summaries'],
         'ranking_explanation': recommendation['ranking_explanation'],
-        'routing_notice': 'Route results use the configured openrouteservice profile but are not a guarantee of compliance with truck height, axle-weight, or road restrictions. Verify restrictions before dispatch.',
+        'routing_notice': routing_notice,
     }

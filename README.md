@@ -37,7 +37,7 @@ The frontend is under `frontend/src`: `PlannerForm` owns journey inputs, `api.js
 - Windows 10/11 with PowerShell 5.1+ or PowerShell 7+
 - Python 3.10+ (Render blueprint currently pins 3.12.8)
 - Node.js 20+ and npm
-- Internet access for provider APIs and MapLibre demo tiles
+- Internet access for provider APIs and CARTO Voyager basemap tiles
 - An [openrouteservice API key](https://openrouteservice.org/dev/#/signup) for autocomplete and directions
 
 Open-Meteo requires no application API key. Nominatim is used only for explicit geocoding, not autocomplete; observe the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). The local geocoder throttles and caches requests in-process. Forecast/geocoding caches are in-memory, per process, and are lost at restart.
@@ -216,7 +216,7 @@ Deployment format follows [Vercel's Django guide](https://vercel.com/docs/framew
 - The planner fetches weather per checkpoint sequentially. A long route at a 10-mile spacing can create many upstream calls and a long request. Provider quotas, rate limiting and deployment request-duration limits apply.
 - In-memory caches are process-local, non-persistent and duplicated across Gunicorn workers. Nominatim's request serialization is also local to one worker.
 - The risk model is a fixed threshold heuristic and does not incorporate official road closures, road surface, vehicle configuration, traffic or driver-specific guidance.
-- Map style/tiles use the public MapLibre demo style by default; choose a production tile provider and comply with its terms/limits for public traffic.
+- The map uses CARTO Voyager vector tiles with OpenStreetMap attribution for clearer roads and place labels. Tile availability, attribution and usage remain subject to CARTO's terms; use a contracted tile service if traffic grows.
 - Current Vite production build emits a large JavaScript chunk advisory. Consider lazy loading MapLibre or manual chunking before scaling.
 - No browser/API authentication, rate limiting, persistent database or user accounts are implemented; protect the API with provider quotas/hosting controls if exposed to untrusted high-volume traffic.
 - Frontend line/branch coverage is not measured yet. Existing frontend tests report test counts, not a code coverage percentage.

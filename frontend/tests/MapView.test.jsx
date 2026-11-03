@@ -20,6 +20,8 @@ describe('MapLibre route and weather layers', () => {
     await waitFor(() => expect(FakeMap.instances[0]?.getSource('route-lines')?.data.features).toHaveLength(2))
     const map = FakeMap.instances[0]
     expect(FakeMap.instances).toHaveLength(1)
+    expect(map.options.style).toBe('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json')
+    expect(map.options.attributionControl).toBe(true)
     expect(map.options.center).toEqual([-98, 39])
     expect(map.getSource('route-lines').data.features[0].geometry).toEqual(routes[0].geometry)
     const checkpoints = map.getSource('weather-checkpoints').data.features

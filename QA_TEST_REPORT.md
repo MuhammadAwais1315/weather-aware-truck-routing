@@ -21,6 +21,7 @@
 | Public frontend-to-backend request | Edge browser fetched backend health successfully from the production dashboard; no uncaught page errors |
 | Public journey submission | New York to Boston returned HTTP 200 with one provider route, six checkpoints, weather at all six, recommendation `route-1`, and route summary |
 | Public full route workflow | Verified in Edge: form → live backend analysis → route card/recommendation → map canvas and worker → forecast slider. No console or HTTP errors. This 219.2-mile trip returned one route due to the provider's 100 km alternative calculation limit |
+| Road map readability | Road network, city labels, attribution and route overlays render clearly | Replaced the sparse MapLibre demo basemap with CARTO Voyager. Live St. Louis County-to-Dallas map loaded its road labels/tiles, the route and checkpoints, and CARTO/OSM attribution; 0 HTTP or console errors |
 | Live Nominatim geocoding | Passed |
 | Live Open-Meteo hourly forecast | Passed, including requested units and UTC timestamp matching |
 | Live complete plan request | Passed with configured production key; the 50-mile checkpoint interval returned 6/6 checkpoints with forecast weather |
@@ -64,6 +65,7 @@ The backend suite last completed with 104 passing tests. The earlier Coverage.py
 - Removed a remote Google Fonts import that produced a browser network error in this environment, and added a local SVG favicon to eliminate the `/favicon.ico` 404.
 - Added `frontend/scripts/live-smoke.mjs` and the `npm run qa:live` command to fill and submit the real dashboard against the running API while capturing browser and HTTP errors.
 - Bundled MapLibre's module worker with Vite and set the emitted URL explicitly; fixed the map label font to use a font stack provided by the selected map style.
+- Replaced the pale MapLibre demo style with CARTO Voyager for clearer road detail, city labels and map context. The style supplies CARTO and OpenStreetMap attribution through MapLibre's attribution control.
 
 ## Build and operational notes
 

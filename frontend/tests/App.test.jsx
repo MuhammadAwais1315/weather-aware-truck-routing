@@ -33,6 +33,12 @@ describe('journey dashboard integration', () => {
     expect(screen.getByText('Recommended route')).toBeInTheDocument()
     expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
     expect(screen.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
+    fireEvent.click(screen.getByRole('tab', {name: 'Timeline'}))
+    expect(await screen.findByRole('heading', {name: 'Estimated route timeline'})).toBeInTheDocument()
+    expect(screen.queryByRole('slider', {name: 'Forecast hour'})).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', {name: 'Map'}))
+    expect(screen.getByTestId('map-view')).toBeInTheDocument()
+    expect(screen.getByRole('slider', {name: 'Forecast hour'})).toBeInTheDocument()
     const payload = planRoute.mock.calls[0][0]
     expect(payload).toMatchObject({origin: 'New York, NY', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
     expect(payload.departure_time).toMatch(/Z$/)

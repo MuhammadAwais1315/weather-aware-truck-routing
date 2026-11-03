@@ -13,6 +13,7 @@ WeatherRoute is a responsive React dashboard backed by Django REST Framework. It
 - Hourly weather matched to each checkpoint ETA. Values are normalized to wind mph and rain/snow inches per hour. Missing forecast values remain unknown.
 - Central weather bands and load overrides, distance-weighted severe/high miles, and recommendation ordering: severe miles, high miles, average risk, then duration. Routes with No Travel segments are not eligible for recommendation.
 - Interactive MapLibre routes, endpoint markers, checkpoint popups/layers, and heatmap exploration from 0 to 48 hours after departure. Exploratory time does not change trip ETA.
+- Map/Timeline switch with a day-by-day estimated driving timeline, actual checkpoint arrival times, weather and risk. It does not invent rest stops or represent driver duty logs/HOS compliance.
 
 ## Architecture
 
@@ -30,7 +31,7 @@ flowchart LR
   UI --> MAP[MapLibre routes, markers and heatmap]
 ```
 
-The frontend is under `frontend/src`: `PlannerForm` owns journey inputs, `api.js` is the Axios client, `contracts.js` checks the response shape, `forecast.js` computes slider timestamps and checkpoint GeoJSON, and `MapView` owns one MapLibre map instance and updates its sources. The backend is under `backend`: `apps/routing` validates requests and orchestrates planning, while `geocoding`, `checkpoints`, `weather`, `risk_engine` and `recommendations` keep domain logic isolated. `services` contains shared HTTP, route-provider and DRF exception handling. Provider credentials are only read by the backend.
+The frontend is under `frontend/src`: `PlannerForm` owns journey inputs, `api.js` is the Axios client, `contracts.js` checks the response shape, `forecast.js` computes slider timestamps and checkpoint GeoJSON, `activityTimeline.js` builds day/segment data from route checkpoint ETAs, `TripActivityTimeline` displays estimated route activity, and `MapView` owns one MapLibre map instance and updates its sources. The backend is under `backend`: `apps/routing` validates requests and orchestrates planning, while `geocoding`, `checkpoints`, `weather`, `risk_engine` and `recommendations` keep domain logic isolated. `services` contains shared HTTP, route-provider and DRF exception handling. Provider credentials are only read by the backend.
 
 ## Requirements
 

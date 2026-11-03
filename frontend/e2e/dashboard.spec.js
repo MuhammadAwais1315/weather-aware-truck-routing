@@ -14,7 +14,7 @@ async function stubProviders(page, plans, {planDelay = 0} = {}) {
     if (planDelay) await new Promise(resolve => setTimeout(resolve, planDelay))
     await route.fulfill({status: 200, json: plans[planIndex]})
   })
-  await page.route('https://demotiles.maplibre.org/style.json', route => route.fulfill({
+  await page.route('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json', route => route.fulfill({
     status: 200,
     headers: {'access-control-allow-origin': '*'},
     json: {version: 8, name: 'Test map', sources: {}, layers: [{id: 'background', type: 'background', paint: {'background-color': '#eef2ef'}}]},
@@ -49,6 +49,11 @@ test('autocomplete, journey API integration, route recommendation, map, and fore
   await expect(page.getByRole('heading', {name: 'Compare 2 routes'})).toBeVisible()
   await expect(page.getByText('BEST OPTION')).toBeVisible()
   await expect(page.getByText('Recommended route', {exact: true})).toBeVisible()
+  await expect(page.locator('.map-wrap .map-canvas')).toHaveCount(1)
+  await page.getByRole('tab', {name: 'Timeline'}).click()
+  await expect(page.getByRole('heading', {name: 'Estimated route timeline'})).toBeVisible()
+  await expect(page.locator('.activity-event-list').getByText('Depart', {exact: true})).toBeVisible()
+  await page.getByRole('tab', {name: 'Map'}).click()
   await expect(page.locator('.map-wrap .map-canvas')).toHaveCount(1)
   await expect(page.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
   await page.getByRole('slider', {name: 'Forecast hour'}).fill('12')

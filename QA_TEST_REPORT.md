@@ -11,9 +11,9 @@
 | Area | Result |
 |---|---|
 | Django tests | **104 passed**, 0 failed, 0 skipped |
-| React/Vitest tests | **29 passed**, 0 failed, 0 skipped |
+| React/Vitest tests | **36 passed**, 0 failed, 0 skipped |
 | Playwright browser tests | **4 passed**, 0 failed, 0 skipped |
-| Total automated tests | **137 passed**, 0 failed, 0 skipped |
+| Total automated tests | **144 passed**, 0 failed, 0 skipped |
 | Production frontend build | Passed; Vite reports a large JavaScript chunk warning |
 | Public Vercel frontend | Page and React form returned HTTP 200; live journey succeeded; Edge smoke had 0 page errors, console errors or failed HTTP responses |
 | Public Vercel backend | Django deployed; `/api/health/` returned HTTP 200 JSON with status `ok` and version `1.0.0` |
@@ -51,6 +51,7 @@ The backend suite last completed with 104 passing tests. The earlier Coverage.py
 | Recommendation priorities | Sort by severe miles, high miles, average risk, then duration | Independent unit tests exercise each priority; fewer alternatives and all-unsafe cases included | **PASS** (automated) |
 | Unsafe route handling | Never recommend a No Travel route as safe; return “No safe route available” if all unsafe | Recommendation engine tests verify unsafe exclusion/all unsafe behavior; UI test verifies recommendation display | **PASS** (automated) |
 | Map route rendering | Display returned routes and highlight recommended route | Playwright map integration test validates rendered route layers and recommendation highlighting using API fixtures | **PASS** (automated) |
+| Trip activity timeline | Switch between Map and Timeline, inspect estimated driving spans and actual checkpoint ETA/risk per day | Vitest and Playwright verify view switching, checkpoint events, weather labels, multi-day selector, and day-boundary segment clipping. Timeline clearly states it is not an HOS log | **PASS** (automated) |
 | Checkpoint markers and popups | Marker risk color and popup show checkpoint weather/ETA/risk/load details | Browser test exercises checkpoint popup content using fixture response | **PASS** (automated) |
 | Heatmap and 0–48-hour slider | Slider updates exploratory forecast time, heatmap and checkpoint visualization without changing trip ETA | Browser and frontend tests cover slider calculations, forecast timestamp selection, GeoJSON updates and missing hours | **PASS** (automated) |
 | API failure/loading states | Clear loading and error behavior; stale results removed after failed/repeated submission | Playwright tests cover failure/loading UI and second submission removing old cards/map state | **PASS** (automated) |

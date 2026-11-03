@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import PlannerForm from './components/PlannerForm.jsx'
 import MapView from './components/MapView.jsx'
+import TripActivityTimeline from './components/TripActivityTimeline.jsx'
 import RouteCard from './components/RouteCard.jsx'
 import {planRoute} from './api.js'
 import {buildCheckpointGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
@@ -14,6 +15,7 @@ export default function App(){
  const [loading,setLoading]=useState(false)
  const [error,setError]=useState('')
  const [forecastHour,setForecastHour]=useState(0)
+ const [activityView,setActivityView]=useState('map')
  const requestGate=useRef(null)
  if(!requestGate.current)requestGate.current=createRequestGate()
  useEffect(()=>()=>requestGate.current?.cancel(),[])
@@ -25,7 +27,7 @@ export default function App(){
 
  async function submit(payload){
    const request=requestGate.current.start()
-   setLoading(true);setError('');setPlan(null);setSelected(null);setForecastHour(0)
+   setLoading(true);setError('');setPlan(null);setSelected(null);setForecastHour(0);setActivityView('map')
   try{
    const result=await planRoute(payload,request.signal)
    if(!requestGate.current.isCurrent(request))return
@@ -66,10 +68,10 @@ export default function App(){
    </section>
 
    {routes.length>0&&<section className="analysis-layout">
-    <div className="map-panel"><div className="map-toolbar"><div className="map-label"><span className="map-pin">⌖</span><div><b>{active?`${plan.origin.label.split(',')[0]} → ${plan.destination.label.split(',')[0]}`:'Route overview'}</b><small>{active?`${active.distance_miles.toLocaleString()} miles · ${active.duration_hours} hours`:'Select a route to inspect its map'}</small></div></div><div className="legend"><span><i className="dot low"/>Low</span><span><i className="dot moderate"/>Moderate</span><span><i className="dot high"/>High</span><span><i className="dot severe"/>Severe</span><span><i className="dot no-travel"/>No travel</span></div></div>
+    <div className="map-panel"><div className="map-toolbar"><div className="map-label"><span className="map-pin">⌖</span><div><b>{active?`${plan.origin.label.split(',')[0]} → ${plan.destination.label.split(',')[0]}`:'Route overview'}</b><small>{active?`${active.distance_miles.toLocaleString()} miles · ${active.duration_hours} hours`:'Select a route to inspect its path and activities'}</small></div></div><div className="activity-toolbar-actions"><div className="legend"><span><i className="dot low"/>Low</span><span><i className="dot moderate"/>Moderate</span><span><i className="dot high"/>High</span><span><i className="dot severe"/>Severe</span><span><i className="dot no-travel"/>No travel</span></div><div className="activity-view-switch" role="tablist" aria-label="Trip view"><button type="button" role="tab" aria-selected={activityView==='map'} onClick={()=>setActivityView('map')}>Map</button><button type="button" role="tab" aria-selected={activityView==='timeline'} onClick={()=>setActivityView('timeline')}>Timeline</button></div></div></div>
      {plan.routing_notice&&<div className="routing-notice">ⓘ {plan.routing_notice}</div>}
-     <div className="map-wrap"><MapView routes={routes} selectedRouteId={active?.id} recommendedRouteId={plan.recommended_route_id} forecastHour={forecastHour} departureTime={plan.departure_time} origin={plan.origin} destination={plan.destination}/></div>
-     <div className="forecast-bar"><div className="forecast-title"><span className="forecast-icon">◷</span><div><b>Forecast exploration</b><small>Exploration time is separate from checkpoint ETA</small></div></div><div className="slider-wrap"><input aria-label="Forecast hour" aria-valuetext={selectedForecastTimestamp?formatForecastTimestamp(selectedForecastTimestamp):'Forecast unavailable'} type="range" min="0" max="48" step="1" value={forecastHour} onChange={event=>setForecastHour(Number(event.target.value))}/><div className="slider-ticks"><span>Depart</span><span>12h</span><span>24h</span><span>36h</span><span>48h</span></div><div className="selected-forecast-time"><b>{formatForecastTimestamp(selectedForecastTimestamp)}</b><span>{selectedForecastGeoJSON?.features.length?`${selectedForecastGeoJSON.features.length} checkpoint forecast${selectedForecastGeoJSON.features.length===1?'':'s'} available`:'No checkpoint forecasts available for this time'}</span></div></div><div className="forecast-value">+{forecastHour}<small>hours</small></div></div>
+     {activityView==='map'?<><div className="map-wrap"><MapView routes={routes} selectedRouteId={active?.id} recommendedRouteId={plan.recommended_route_id} forecastHour={forecastHour} departureTime={plan.departure_time} origin={plan.origin} destination={plan.destination}/></div>
+     <div className="forecast-bar"><div className="forecast-title"><span className="forecast-icon">◷</span><div><b>Forecast exploration</b><small>Exploration time is separate from checkpoint ETA</small></div></div><div className="slider-wrap"><input aria-label="Forecast hour" type="range" min="0" max="48" step="1" value={forecastHour} onChange={event=>setForecastHour(Number(event.target.value))}/><div className="slider-ticks"><span>Depart</span><span>12h</span><span>24h</span><span>36h</span><span>48h</span></div><div className="selected-forecast-time"><b>{formatForecastTimestamp(selectedForecastTimestamp)}</b><span>{selectedForecastGeoJSON?.features.length?`${selectedForecastGeoJSON.features.length} checkpoint forecast${selectedForecastGeoJSON.features.length===1?'':'s'} available`:'No checkpoint forecasts available for this time'}</span></div></div><div className="forecast-value">+{forecastHour}<small>hours</small></div></div></>:<TripActivityTimeline route={active} departureTime={plan.departure_time}/>}
     </div>
     <aside className="checkpoint-panel"><div className="checkpoint-panel-heading"><span className="section-kicker">ON THE WAY</span><h3>Checkpoint outlook</h3><p>{active?`${active.checkpoints.length} forecast checkpoints`:'Select a route'}</p></div>{active&&<div className="checkpoint-list dashboard-checkpoints">{active.checkpoints.map(point=><div className="checkpoint weather-checkpoint" key={point.id||point.index}><div className="checkpoint-top"><i className={`dot ${point.risk.level}`}/><span>{point.distance_miles} mi</span><b>{point.risk.score??'—'}</b></div><small>Wind {weatherValue(point.weather?.wind_speed_mph)} mph<br/>Rain {weatherValue(point.weather?.rain_inches_per_hour,3)} in/hr · Snow {weatherValue(point.weather?.snowfall_inches_per_hour,3)} in/hr</small></div>)}</div>}</aside>
    </section>}

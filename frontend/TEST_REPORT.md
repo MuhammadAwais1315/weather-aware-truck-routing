@@ -8,9 +8,9 @@
 
 | Suite | Tests | Passed | Failed | Skipped |
 |---|---:|---:|---:|---:|
-| Vitest + React Testing Library | 29 | 29 | 0 | 0 |
+| Vitest + React Testing Library | 36 | 36 | 0 | 0 |
 | Playwright browser tests | 4 | 4 | 0 | 0 |
-| **Total** | **33** | **33** | **0** | **0** |
+| **Total** | **40** | **40** | **0** | **0** |
 
 ## Coverage exercised
 
@@ -21,6 +21,7 @@
 - MapLibre route/checkpoint GeoJSON, severity heatmap weights, layer controls, checkpoint popup details, map cleanup, and replacement of old route data.
 - Forecast slider values, selected timestamp, and unavailable forecast hours.
 - Repeated journey submissions and replacement of old cards/map canvas.
+- Map/Timeline switching, ETA-based estimated driving segments, risk-colored weather checkpoints, and day selection for cross-midnight journeys. This timeline does not assert actual HOS duty statuses or fabricated stops.
 - Desktop (1440 px), tablet (768 px), and mobile (390 px) responsive layouts without horizontal overflow.
 
 Playwright network routes return deterministic test responses for geocoding and `/api/plan/`; these browser tests verify UI-to-client behavior without depending on external providers or a live Django server. The separate API client contract test verifies the frontend request path and validates the backend response schema.

@@ -14,9 +14,10 @@ if not DEBUG and (not os.getenv('DJANGO_SECRET_KEY') or SECRET_KEY == 'unsafe-lo
     raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is false.')
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
-render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
-if render_hostname and render_hostname not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(render_hostname)
+for host_variable in ('RENDER_EXTERNAL_HOSTNAME', 'VERCEL_URL', 'VERCEL_PROJECT_PRODUCTION_URL'):
+    deployment_hostname = os.getenv(host_variable, '').strip().removeprefix('https://').removeprefix('http://').rstrip('/')
+    if deployment_hostname and deployment_hostname not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(deployment_hostname)
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
 INSTALLED_APPS = [

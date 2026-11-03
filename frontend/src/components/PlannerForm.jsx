@@ -43,7 +43,7 @@ export default function PlannerForm({onSubmit,loading}){
   <AddressInput label="Destination" name="destination" value={form.destination} onChange={update} placeholder="Where are you headed?"/>
   <label className="dashboard-field">Departure date<input required type="date" name="departure_date" value={form.departure_date} onChange={update}/></label>
   <label className="dashboard-field">Departure time<input required type="time" name="departure_time" value={form.departure_time} onChange={update}/></label>
-  <label className="dashboard-field">Load weight <span className="unit-label">(lb)</span><input required type="number" min="0" max="200000" step="1" name="load_weight_lb" value={form.load_weight_lb} onChange={update} placeholder="e.g. 42,000"/></label>
+  <label className="dashboard-field"><span className="field-label-title">Load weight <span className="unit-label">(lb)</span></span><input required type="number" min="0" max="200000" step="1" name="load_weight_lb" value={form.load_weight_lb} onChange={update} placeholder="e.g. 42,000"/></label>
   <label className="dashboard-field">Checkpoint interval<select name="checkpoint_interval_miles" value={form.checkpoint_interval_miles} onChange={update}><option value="10">Every 10 miles</option><option value="25">Every 25 miles</option><option value="50">Every 50 miles</option></select></label>
   <button className="primary-button plan-button" disabled={loading}>{loading?<><span className="button-spinner"/>Analyzing routes…</>:'Analyze routes'}{!loading&&<span className="button-arrow">→</span>}</button>
  </form>

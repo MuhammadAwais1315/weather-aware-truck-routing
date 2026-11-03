@@ -4,6 +4,8 @@
 **Environment:** Local Django development server (`127.0.0.1:8000`), Vite (`127.0.0.1:5174`), Edge browser, Docker Python 3.12.  
 **Scope:** Complete user journey, real provider connectivity where configured, automated backend/frontend suites, browser behavior, application logs, and production frontend build.
 
+**Publishing status:** Private GitHub repo [MuhammadAwais1315/weather-aware-truck-routing](https://github.com/MuhammadAwais1315/weather-aware-truck-routing), `main` pushed through commit `f7dfeb0`. Vercel production URL: [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app/).
+
 ## Summary
 
 | Area | Result |
@@ -13,6 +15,8 @@
 | Playwright browser tests | **4 passed**, 0 failed, 0 skipped |
 | Total automated tests | **134 passed**, 0 failed, 0 skipped |
 | Production frontend build | Passed; Vite reports a large JavaScript chunk warning |
+| Public Vercel frontend | Page and React form returned HTTP 200; JavaScript bundle returned HTTP 200; Edge smoke had 0 page/console errors |
+| Public full application workflow | **Not verified**: Vercel has no `VITE_API_BASE_URL`, bundle uses the local `127.0.0.1:8000/api` default, and there is no deployed Render API URL |
 | Live Nominatim geocoding | Passed |
 | Live Open-Meteo hourly forecast | Passed, including requested units and UTC timestamp matching |
 | Live complete plan request | **Blocked**: `OPENROUTESERVICE_API_KEY` is not configured; backend correctly returned HTTP 503 |

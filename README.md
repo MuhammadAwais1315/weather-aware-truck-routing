@@ -179,7 +179,7 @@ Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate o
 
 ## Deployment preparation
 
-Deployment configuration is included but the project is **not deployed or publicly verified**. At this QA session no Vercel/Render CLI, deployment token, or public deployment URL was available. Do not treat this repository configuration or local QA as a live public deployment.
+The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. The frontend is deployed to [Vercel](https://weather-aware-truck-routing-psi.vercel.app/); its production page and React form were publicly checked in Edge. **The full application is not yet deployed or verified end to end:** no Render backend URL is active and Vercel has no `VITE_API_BASE_URL`, so its current frontend bundle still uses the local development default (`http://127.0.0.1:8000/api`). Do not present the public static page check as successful live route analysis.
 
 ### Render backend
 
@@ -189,11 +189,11 @@ The app currently has no user/account or durable business data, so no production
 
 ### Vercel frontend
 
-Import this repository into Vercel and set the project **Root Directory** to `frontend`. The [`frontend/vercel.json`](frontend/vercel.json) rewrite supports Vite SPA fallback. Add `VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api` as a Vercel environment variable for Production (and Preview only if a preview API is configured), then deploy/redeploy so Vite embeds the production API address. Vercel variables beginning `VITE_` are public build-time configuration; never place provider keys there. Add the final Vercel production origin to Render's `CORS_ALLOWED_ORIGINS` and redeploy the backend.
+The current Vercel project is `weather-aware-truck-routing`, with root directory `frontend`; [`frontend/vercel.json`](frontend/vercel.json) provides SPA fallback. Before workflow verification, deploy the backend to Render, then add `VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api` to the Vercel Production environment and redeploy so Vite embeds the API address. Vercel variables beginning `VITE_` are public build-time configuration; never place provider keys there. Add the final Vercel production origin to Render's `CORS_ALLOWED_ORIGINS` and redeploy the backend. The current public URL was deployed via CLI; GitHub automatic deployments are not configured.
 
 ### Production verification checklist
 
-After both services deploy, verify in a browser and from PowerShell:
+After both services deploy and the Vercel API environment variable is set, verify in a browser and from PowerShell:
 
 ```powershell
 Invoke-RestMethod https://<your-render-service>.onrender.com/api/health/

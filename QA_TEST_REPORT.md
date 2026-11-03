@@ -4,7 +4,7 @@
 **Environment:** Local Django development server (`127.0.0.1:8000`), Vite (`127.0.0.1:5174`), Edge browser, Docker Python 3.12.  
 **Scope:** Complete user journey, real provider connectivity where configured, automated backend/frontend suites, browser behavior, application logs, and production frontend build.
 
-**Publishing status:** Private GitHub repo [MuhammadAwais1315/weather-aware-truck-routing](https://github.com/MuhammadAwais1315/weather-aware-truck-routing), `main` pushed through commit `f7dfeb0`. Vercel production URL: [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app/).
+**Publishing status:** Private GitHub repo [MuhammadAwais1315/weather-aware-truck-routing](https://github.com/MuhammadAwais1315/weather-aware-truck-routing), `main` includes current deployment changes. Vercel production frontend: [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app/). Vercel production API: [weather-aware-truck-routing-api-kappa.vercel.app](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/).
 
 ## Summary
 
@@ -16,7 +16,11 @@
 | Total automated tests | **134 passed**, 0 failed, 0 skipped |
 | Production frontend build | Passed; Vite reports a large JavaScript chunk warning |
 | Public Vercel frontend | Page and React form returned HTTP 200; JavaScript bundle returned HTTP 200; Edge smoke had 0 page/console errors |
-| Public full application workflow | **Not verified**: Vercel has no `VITE_API_BASE_URL`, bundle uses the local `127.0.0.1:8000/api` default, and there is no deployed Render API URL |
+| Public Vercel backend | Django deployed; `/api/health/` returned HTTP 200 JSON with status `ok` and version `1.0.0` |
+| Production CORS | Preflight from the deployed frontend origin returned HTTP 200 and `Access-Control-Allow-Origin` matched exactly |
+| Public frontend-to-backend request | Edge browser fetched backend health successfully from the production dashboard; no uncaught page errors |
+| Public journey submission | Form submitted to production API and displayed its actual HTTP 503 error: `OPENROUTESERVICE_API_KEY is not configured.` Route analysis is blocked until the key is added |
+| Public full route workflow | **Not verified**: API URL and CORS are configured, but ORS credentials are absent, so no real alternatives/checkpoints/map workflow is available publicly |
 | Live Nominatim geocoding | Passed |
 | Live Open-Meteo hourly forecast | Passed, including requested units and UTC timestamp matching |
 | Live complete plan request | **Blocked**: `OPENROUTESERVICE_API_KEY` is not configured; backend correctly returned HTTP 503 |

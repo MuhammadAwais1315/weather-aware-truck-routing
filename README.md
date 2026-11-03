@@ -179,34 +179,38 @@ Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate o
 
 ## Deployment preparation
 
-The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. The frontend is deployed to [Vercel](https://weather-aware-truck-routing-psi.vercel.app/); its production page and React form were publicly checked in Edge. **The full application is not yet deployed or verified end to end:** no Render backend URL is active and Vercel has no `VITE_API_BASE_URL`, so its current frontend bundle still uses the local development default (`http://127.0.0.1:8000/api`). Do not present the public static page check as successful live route analysis.
+The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. Both the [React frontend](https://weather-aware-truck-routing-psi.vercel.app/) and [Django API](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/) are deployed to Vercel. The frontend's public page, React form, cross-origin health request and API error handling were checked in Edge. **The full journey is not yet verified:** the production plan request returns HTTP 503 because `OPENROUTESERVICE_API_KEY` has not been configured. Do not present this as successful route analysis until a key is added and a real journey completes.
 
-### Render backend
+### Render backend (alternative)
 
 The root [`render.yaml`](render.yaml) defines a Python web service rooted at `backend/`, installs requirements, applies Django migrations at start, serves WSGI with Gunicorn, and exposes `/api/health/` as the health check. In Render, create a Blueprint from the connected repository. Set the prompted `OPENROUTESERVICE_API_KEY` and `CORS_ALLOWED_ORIGINS` values in Render. Once Vercel provides its production domain, set `CORS_ALLOWED_ORIGINS=https://<your-vercel-domain>` (exact origin, no path or trailing slash), save and deploy. Render supplies `RENDER_EXTERNAL_HOSTNAME`; settings add that service host to Django's host allowlist. Keep `DEBUG=false` and do not paste secrets into `render.yaml`.
 
 The app currently has no user/account or durable business data, so no production database is required for the current feature set. Django's installed built-in auth/contenttypes migrations are run by the Render start command. Per-process geocoding/weather caches are ephemeral and not shared between workers.
 
+### Vercel backend
+
+The Vercel API project `weather-aware-truck-routing-api` is rooted at `backend/`, where [`backend/vercel.json`](backend/vercel.json) sets a 180-second function duration and excludes test/cache files. Vercel detects Django from `manage.py`, and Python 3.12 is declared in `backend/.python-version`. Production has `DEBUG=False`, a generated secret, and an exact CORS allow-origin for the frontend. The runtime derives its deployment host from Vercel system variables. The deployed API health check returns `{"status":"ok","version":"1.0.0"}`. Add `OPENROUTESERVICE_API_KEY` in the backend project's Vercel Production environment to enable autocomplete and real alternatives. The local `render.yaml` remains an alternative backend host configuration.
+
 ### Vercel frontend
 
-The current Vercel project is `weather-aware-truck-routing`, with root directory `frontend`; [`frontend/vercel.json`](frontend/vercel.json) provides SPA fallback. Before workflow verification, deploy the backend to Render, then add `VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api` to the Vercel Production environment and redeploy so Vite embeds the API address. Vercel variables beginning `VITE_` are public build-time configuration; never place provider keys there. Add the final Vercel production origin to Render's `CORS_ALLOWED_ORIGINS` and redeploy the backend. The current public URL was deployed via CLI; GitHub automatic deployments are not configured.
+The Vercel frontend project `weather-aware-truck-routing` is rooted at `frontend`; [`frontend/vercel.json`](frontend/vercel.json) provides SPA fallback. Its Production environment now includes `VITE_API_BASE_URL=https://weather-aware-truck-routing-api-kappa.vercel.app/api`; Vite embeds this public API URL at build time. Variables beginning `VITE_` are public configuration; never place provider keys there. The production frontend origin is allowed in backend CORS. Deployments were made via CLI; GitHub automatic deployments are not configured.
 
 ### Production verification checklist
 
-After both services deploy and the Vercel API environment variable is set, verify in a browser and from PowerShell:
+The current production health/browser-CORS checks have passed. After adding an ORS key, verify a complete journey in a browser and from PowerShell:
 
 ```powershell
-Invoke-RestMethod https://<your-render-service>.onrender.com/api/health/
-Invoke-WebRequest https://<your-vercel-domain>/
+Invoke-RestMethod https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/
+Invoke-WebRequest https://weather-aware-truck-routing-psi.vercel.app/
 ```
 
-Then submit a journey with each checkpoint interval (10, 25, 50), confirm the browser network panel shows the production `POST /api/plan/` succeeding, and inspect actual ORS route counts, geometries, checkpoint ETA/weather, risk/ranking, route layers/popups, and heatmap slider at several hours. Test a deliberately invalid/unavailable route request and missing forecast hour. Check Render logs and browser console for unexpected failures. A successful health check alone does not verify the workflow; only mark deployment verified after these public checks succeed.
+Then submit a journey with each checkpoint interval (10, 25, 50), confirm the browser network panel shows the production `POST /api/plan/` succeeding, and inspect actual ORS route counts, geometries, checkpoint ETA/weather, risk/ranking, route layers/popups, and heatmap slider at several hours. Test a deliberately invalid/unavailable route request and missing forecast hour. Check Vercel logs and browser console for unexpected failures. A successful health check alone does not verify the workflow; only mark the full application verified after these public checks succeed.
 
-Deployment format follows the [Render Django deployment guide](https://render.com/docs/deploy-django) and [Vercel Vite guidance](https://vercel.com/docs/frameworks/frontend/vite). See also [Render Blueprint environment variables](https://render.com/docs/blueprint-spec) and [Vercel environment variables](https://vercel.com/docs/environment-variables).
+Deployment format follows [Vercel's Django guide](https://vercel.com/docs/frameworks/full-stack/django), [Vercel Vite guidance](https://vercel.com/docs/frameworks/frontend/vite), and the [Render Django deployment guide](https://render.com/docs/deploy-django). See also [Render Blueprint environment variables](https://render.com/docs/blueprint-spec) and [Vercel environment variables](https://vercel.com/docs/environment-variables).
 
 ## Known limitations and risks
 
-- Real ORS alternatives require an active key, quota and provider availability. A live end-to-end route analysis has not been verified in this checkout because no key was configured during QA.
+- Real ORS alternatives require an active key, quota and provider availability. The public backend currently returns `routing_not_configured` (HTTP 503) until a key is added; no routes are fabricated.
 - HGV profile results are not regulatory clearance; height, axle, weight and road restrictions can be incomplete or missing.
 - Open-Meteo horizon is limited (the service requests seven forecast days). Forecasts beyond available hourly data are reported unavailable; no weather is invented. The 0–48h slider only visualizes forecast observations within its matching window.
 - The planner fetches weather per checkpoint sequentially. A long route at a 10-mile spacing can create many upstream calls and a long request. Provider quotas, rate limiting and deployment request-duration limits apply.

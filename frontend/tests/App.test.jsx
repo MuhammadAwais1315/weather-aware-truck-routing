@@ -35,7 +35,7 @@ describe('journey dashboard integration', () => {
     expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
     expect(screen.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
     fireEvent.click(screen.getByRole('tab', {name: 'Timeline'}))
-    expect(await screen.findByRole('heading', {name: 'Estimated route timeline'})).toBeInTheDocument()
+    expect(await screen.findByRole('heading', {name: 'Itinerary & stops'})).toBeInTheDocument()
     expect(screen.queryByRole('slider', {name: 'Forecast hour'})).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', {name: 'Map'}))
     expect(screen.getByTestId('map-view')).toBeInTheDocument()

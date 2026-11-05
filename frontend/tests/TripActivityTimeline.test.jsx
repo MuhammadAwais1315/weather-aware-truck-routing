@@ -4,24 +4,28 @@ import TripActivityTimeline from '../src/components/TripActivityTimeline.jsx'
 import {makeRoute} from './fixtures.js'
 
 describe('trip activity timeline UI', () => {
-  it('shows real route checkpoints, local ETAs, risk and weather values', () => {
+  it('shows the itinerary rail with actual arrival dates, risk and weather values', () => {
     const route = makeRoute('route-1', 'Test route', {risk: 'high'})
     render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/>)
-    expect(screen.getByRole('heading', {name: 'Estimated route timeline'})).toBeInTheDocument()
-    expect(screen.getByText('Depart')).toBeInTheDocument()
-    expect(screen.getByText('Arrive')).toBeInTheDocument()
-    expect(screen.getAllByText('High').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/mph wind/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', {name: 'Itinerary & stops'})).toBeInTheDocument()
+    expect(screen.getByText('Trip start')).toBeInTheDocument()
+    expect(screen.getByText('Drop-off')).toBeInTheDocument()
+    expect(screen.getAllByText('High risk').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Wind 19 mph/).length).toBeGreaterThan(0)
+    expect(document.querySelectorAll('.activity-event-time')).toHaveLength(3)
+    expect(screen.getByText('3 events')).toBeInTheDocument()
+    expect(document.querySelector('.activity-chart')).not.toBeInTheDocument()
     expect(screen.getByText(/not a driver duty-status log/)).toBeInTheDocument()
   })
 
-  it('spreads a short trip across the chart and renders every checkpoint event', () => {
+  it('renders all stops in route order with trip mileage', () => {
     const route = makeRoute('route-1', 'Short trip')
     render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/> )
-    const markers = [...document.querySelectorAll('.activity-marker')].map(marker => Number.parseFloat(marker.style.left))
-    expect(markers.at(-1) - markers[0]).toBeGreaterThan(90)
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
-    expect(document.querySelector('.activity-event-list').style.maxHeight).toBe('')
+    const mileage = [...document.querySelectorAll('.activity-stop-meta')].map(item => item.textContent)
+    expect(mileage[0]).toContain('0.0 mi from origin')
+    expect(mileage.at(-1)).toContain('100.0 mi from origin')
+    expect([...document.querySelectorAll('.activity-event-title b')].map(item => item.textContent)).toEqual(['Trip start', 'Pickup', 'Drop-off'])
   })
 
   it('lets the user switch days for trips that span midnight', () => {
@@ -34,7 +38,7 @@ describe('trip activity timeline UI', () => {
     const select = screen.getByRole('combobox', {name: 'Trip day'})
     expect(select.options).toHaveLength(2)
     fireEvent.change(select, {target: {value: select.options[1].value}})
-    expect(screen.getByText('Arrive')).toBeInTheDocument()
+    expect(screen.getByText('Drop-off')).toBeInTheDocument()
   })
 
   it('explains when the route has no usable checkpoint ETAs', () => {

@@ -6,23 +6,37 @@ WeatherRoute helps freight planners compare real road-route options with weather
 
 ## Product tour
 
-### Plan a three-stop journey
+The following screenshots show one Cape May County → Philadelphia → Atlantic City planning session. The route cards and weather values are a forecast snapshot; forecasts can change, and the pictured example demonstrates elevated risk rather than guaranteeing a No Travel classification.
 
-![WeatherRoute journey form with truck location, pickup, destination, departure, load and checkpoint interval](docs/screenshots/journey-planner.png)
+### 1. Enter the truck, pickup, and destination
+
+![Cape May County to Philadelphia to Atlantic City journey form with departure, 42,000-pound load, and 10-mile checkpoints](docs/screenshots/cape-may-planner.png)
 
 Enter a truck's current location, the freight pickup, and the final destination. Set departure date and time, load in pounds, and checkpoints every 10, 25, or 50 miles.
 
-### Inspect the route map and forecast
+### 2. Compare distinct route alternatives
 
-![Route map with checkpoint markers and the 0–48 hour forecast exploration slider](docs/screenshots/map-heatmap.png)
+![Three distinct provider routes compared by distance, duration, severe and high miles, and average risk](docs/screenshots/three-route-comparison.png)
 
-Review actual route geometry, endpoint markers, weather checkpoints, map layers, and the exploratory forecast slider. The slider changes the displayed forecast selection; it does not rewrite trip checkpoint ETAs.
+The recommendation ranks routes by severe miles, high miles, average risk, then duration. In this snapshot, route 3 has no severe miles and is recommended despite having 20 high-risk miles. A CAUTION label indicates elevated risk even when there are no No Travel segments.
 
-### Follow the estimated itinerary
+### 3. Inspect route geometry and weather checkpoints
 
-![Estimated trip timeline with stop and weather checkpoint events](docs/screenshots/timeline.png)
+![Map of the three routes between Cape May County, Philadelphia pickup, and Atlantic City with risk-colored checkpoints and forecast slider](docs/screenshots/cape-may-route-map.png)
 
-The timeline shows departure, pickup, forecast checkpoints, and arrival with estimated local times and weather risk. Checkpoint labels use reverse-geocoded place names when available; when a provider has no nearby name, coordinates remain the fallback.
+Review route alternatives, the pickup and endpoints, risk-colored checkpoints, map layer controls, and forecast slider. The slider changes exploratory forecast display; it does not rewrite trip checkpoint ETAs.
+
+### 4. Follow the estimated timeline
+
+![Cape May trip timeline with named checkpoints, estimated arrival times, and weather risk graph](docs/screenshots/cape-may-timeline.png)
+
+The timeline shows departure and weather checkpoints with estimated local times and weather. Place names are reverse-geocoded when available; coordinates are the fallback when a nearby label is unavailable.
+
+### 5. Review turn-by-turn directions
+
+![Turn-by-turn directions for the Cape May County to Philadelphia and Philadelphia to Atlantic City route legs](docs/screenshots/turn-by-turn-directions.png)
+
+Directions are grouped into the truck-to-pickup and pickup-to-destination legs and use the routing provider's maneuver instructions.
 
 ## What it does
 

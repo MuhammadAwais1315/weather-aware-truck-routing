@@ -253,9 +253,11 @@ class OpenRouteServiceClient:
                     route['segment_durations_seconds'] = (
                         first['segment_durations_seconds'] + second['segment_durations_seconds']
                     )
-                notes = [note for note in (first.get('alternatives_note'), second.get('alternatives_note')) if note]
-                if notes:
-                    route['alternatives_note'] = ' '.join(dict.fromkeys(notes))
+                if first.get('alternatives_note') or second.get('alternatives_note'):
+                    route['alternatives_note'] = (
+                        'OpenRouteService limits alternative-route calculations to legs under 100 km. '
+                        'A leg exceeded that limit and returned one actual route.'
+                    )
                 combinations.append(route)
 
         if not combinations:

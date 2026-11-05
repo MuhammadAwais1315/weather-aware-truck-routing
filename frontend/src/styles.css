@@ -152,6 +152,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .route-safety { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 10px; border-radius: 8px; font-size: 11px; }
 .route-safety.safe { background: #edf8f0; color: #32734c; }
 .route-safety.unsafe { background: #fff1ef; color: #a14137; }
+.route-safety.unknown { background: #fff8e8; color: #8a6416; }
+.route-coverage { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 8px 2px 0; color: #8a6416; font-size: 11px; }
+.route-coverage span { flex-basis: 100%; color: #7d817f; }
 .safety-status-icon { display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: #ffffffb5; font-weight: 800; }
 .safety-state { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: .5px; }
 .result-recommendation { gap: 13px; margin-top: 17px; padding: 15px 17px; border-radius: 11px; }
@@ -159,6 +162,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .result-recommendation p { color: #697c70; font-size: 12px; line-height: 1.55; }
 .result-recommendation .rec-icon { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: #e2f3e8; font-size: 16px; }
 .result-recommendation.unsafe { background: #fff5f3; }
+.result-recommendation.incomplete { background: #fff8e8; border-color: #ead9a8; }
+.result-recommendation.incomplete b { color: #8a6416; }
+.result-recommendation.incomplete p { color: #776840; }
+.result-recommendation.incomplete .rec-icon { background: #fff0c8; color: #8a6416; }
 
 .analysis-layout { display: grid; grid-template-columns: minmax(0, 2.25fr) minmax(270px, .85fr); align-items: start; gap: 17px; margin-top: 20px; }
 .map-panel { min-width: 0; }

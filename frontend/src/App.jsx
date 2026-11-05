@@ -64,7 +64,7 @@ export default function App(){
    <section className="route-results">
     <div className="results-heading"><div><span className="section-kicker">ROUTE ANALYSIS</span><h2>{routes.length?`Compare ${routes.length} route${routes.length===1?'':'s'}`:'No route alternatives returned'}</h2><p>{routes.length?'Each route starts at the truck, visits the pickup, then continues to the destination.':'Try adjusting the locations or departure details and analyze again.'}</p></div><div className="results-total"><strong>{routes.length}</strong><span>available<br/>alternative{routes.length===1?'':'s'}</span></div></div>
     {routes.length>0&&<div className="comparison-grid">{routes.map(route=><RouteCard key={route.id} route={route} summary={routeSummaries.get(route.id)} departureTime={plan.departure_time} active={active?.id===route.id} onClick={()=>setSelected(route.id)}/>)}</div>}
-    <div className={`recommendation result-recommendation ${plan.recommended_route_id?'':'unsafe'}`}><span className="rec-icon">{plan.recommended_route_id?'✦':'!'}</span><div><b>{plan.recommended_route_id?'Recommended route':'No safe route available'}</b><p>{plan.ranking_explanation||plan.recommendation?.reason}</p></div></div>
+    <div className={`recommendation result-recommendation ${plan.recommended_route_id?'':plan.recommendation_status==='incomplete_forecasts'?'incomplete':'unsafe'}`}><span className="rec-icon">{plan.recommended_route_id?'✦':'!'}</span><div><b>{plan.recommended_route_id?'Recommended route':plan.recommendation_status==='incomplete_forecasts'?'Forecast coverage incomplete':'No safe route available'}</b><p>{plan.ranking_explanation||plan.recommendation?.reason}</p></div></div>
    </section>
 
    {routes.length>0&&<section className="analysis-layout">
@@ -77,7 +77,7 @@ export default function App(){
    </section>}
   </>}
 
-  {!plan&&!loading&&!error&&<section className="dashboard-empty"><div className="empty-orbit">⌖</div><span className="section-kicker">READY WHEN YOU ARE</span><h2>Your next journey starts here</h2><p>Enter an origin, destination and departure details above to compare real routes and weather exposure.</p><div className="empty-features"><span>↗ Real route alternatives</span><span>◷ Arrival-time forecasts</span><span>✳ Checkpoint risk analysis</span></div></section>}
+  {!plan&&!loading&&!error&&<section className="dashboard-empty"><div className="empty-orbit">⌖</div><span className="section-kicker">READY WHEN YOU ARE</span><h2>Your next journey starts here</h2><p>Enter the truck location, pickup, destination and departure details above to compare real routes and weather exposure.</p><div className="empty-features"><span>↗ Real route alternatives</span><span>◷ Arrival-time forecasts</span><span>✳ Checkpoint risk analysis</span></div></section>}
 
   <footer><span>WeatherRoute <i>·</i> Plan smarter. Drive safer.</span><span>Forecasts are estimates and do not replace official road advisories.</span></footer>
  </main>

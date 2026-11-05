@@ -77,6 +77,9 @@ def summarize_route(route):
     high_miles = 0.0
     no_travel_miles = 0.0
     no_travel_segments = []
+    unknown_weather_miles = 0.0
+    unknown_weather_segments = []
+    segment_miles_total = 0.0
     weighted_risk_total = 0.0
     scored_miles = 0.0
 
@@ -89,6 +92,7 @@ def summarize_route(route):
         segment_miles = max(0.0, end_distance - start_distance)
         if segment_miles <= 0:
             continue
+        segment_miles_total += segment_miles
         label = _risk_label(start)
         risk_score = _risk_score(start, label)
         if label == 'Severe':
@@ -107,8 +111,30 @@ def summarize_route(route):
         if risk_score is not None:
             weighted_risk_total += risk_score * segment_miles
             scored_miles += segment_miles
+        else:
+            unknown_weather_miles += segment_miles
+            unknown_weather_segments.append({
+                'segment_id': f'{route_id}-segment-{index + 1:04d}',
+                'from_distance_miles': round(start_distance, 6),
+                'to_distance_miles': round(end_distance, 6),
+                'distance_miles': round(segment_miles, 6),
+                'checkpoint_id': start.get('id'),
+            })
+
+    # If checkpoint coverage is missing at either end (or checkpoints are absent),
+    # treat the unrepresented route distance as unknown rather than as low risk.
+    unknown_weather_miles += max(0.0, distance_miles - segment_miles_total)
 
     average_risk = round(weighted_risk_total / scored_miles, 2) if scored_miles > 0 else None
+    weather_coverage_percentage = (
+        round(min(100.0, scored_miles / distance_miles * 100), 1) if distance_miles > 0 else 0.0
+    )
+    if unknown_weather_miles <= 1e-6:
+        safety_status = 'unsafe' if no_travel_segments else 'safe'
+        forecast_status = 'complete'
+    else:
+        safety_status = 'unsafe' if no_travel_segments else 'unknown'
+        forecast_status = 'unavailable' if scored_miles <= 0 else 'partial'
     return {
         'route_id': route_id,
         'route_name': route.get('name', route_id),
@@ -117,10 +143,16 @@ def summarize_route(route):
         'severe_miles': round(severe_miles, 2),
         'high_miles': round(high_miles, 2),
         'average_risk': average_risk,
+        'weather_coverage_miles': round(scored_miles, 2),
+        'weather_coverage_percentage': weather_coverage_percentage,
+        'unknown_weather_miles': round(unknown_weather_miles, 2),
+        'unknown_weather_segments': unknown_weather_segments,
+        'forecast_status': forecast_status,
+        'safety_status': safety_status,
         'no_travel_segments': no_travel_segments,
         'no_travel_segment_count': len(no_travel_segments),
         'no_travel_miles': round(no_travel_miles, 2),
-        'safe': not no_travel_segments,
+        'safe': safety_status == 'safe',
     }
 
 
@@ -147,8 +179,13 @@ def recommend_route(routes):
             f"{len(safe_summaries)} safe route(s) by {', '.join(RANKING_PRIORITIES)}. "
             'Routes containing No Travel segments are excluded from recommendation.'
         )
-    elif route_summaries:
+    elif route_summaries and all(summary['no_travel_segment_count'] > 0 for summary in route_summaries):
         explanation = 'No safe route available: every available route contains one or more No Travel segments.'
+    elif route_summaries:
+        explanation = (
+            'No route can be recommended as safe because weather forecast coverage is incomplete '
+            'for one or more route segments. Review the forecast coverage before choosing a route.'
+        )
     else:
         explanation = 'No safe route available: the routing provider returned no routes to compare.'
 
@@ -168,6 +205,12 @@ def recommend_route(routes):
         })
 
     return {
+        'recommendation_status': (
+            'recommended' if selected else
+            'no_routes' if not route_summaries else
+            'all_unsafe' if all(summary['no_travel_segment_count'] > 0 for summary in route_summaries) else
+            'incomplete_forecasts'
+        ),
         'recommended_route_id': recommended_route_id,
         'route_id': recommended_route_id,  # Backward compatibility for the existing React client.
         'ranked_routes': ranked_routes,

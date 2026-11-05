@@ -178,7 +178,7 @@ Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate o
 - Snow (inches/hour): `<0.5` Low; `0.5–<1.0` Moderate; `1.0–<2.0` High; `2.0–3.0` Severe; `>3.0` No Travel.
 - Load rules: wind `>=55 mph` is No Travel for every load; wind `45–54 mph` with load `>30,000 lb` is No Travel; wind `35–44 mph` with load `>40,000 lb` is at least Severe.
 - The checkpoint final risk is the highest of known weather-component risks and any applied load override. If every weather component is missing, risk is `Unknown`/null, not Low.
-- Segment risk applies over the distance from one checkpoint to the next. The last destination point contributes no extra miles. Recommendation priorities are severe miles, high miles, average risk, and travel duration. A route with any No Travel segment cannot be recommended; if every route is unsafe the recommended route ID is null and the explanation is `No safe route available`.
+- Segment risk applies over the distance from one checkpoint to the next. The last destination point contributes no extra miles. Recommendation priorities are severe miles, high miles, average risk, and travel duration. A route with any No Travel segment cannot be recommended. Routes with incomplete forecast coverage are reported as unknown and cannot be labeled safe or recommended. Route summaries include weather coverage and unknown-weather miles; if every complete-coverage route is unsafe, the recommended route ID is null and the explanation is `No safe route available`.
 
 ## Deployment preparation
 

@@ -112,5 +112,12 @@ test('dashboard fits mobile, tablet, and desktop widths without horizontal overf
     const dimensions = await page.evaluate(() => ({width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth}))
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width + 1)
     await expect(page.getByRole('slider', {name: 'Forecast hour'})).toBeVisible()
+    await page.getByRole('tab', {name: 'Timeline'}).click()
+    await expect(page.getByRole('heading', {name: 'Estimated route timeline'})).toBeVisible()
+    await expect(page.locator('.activity-track')).toBeVisible()
+    await expect(page.locator('.activity-event-list li')).toHaveCount(3)
+    const timelineDimensions = await page.locator('.trip-activity-view').evaluate(element => ({width: element.clientWidth, scrollWidth: element.scrollWidth}))
+    expect(timelineDimensions.scrollWidth).toBeLessThanOrEqual(timelineDimensions.width + 1)
+    await page.getByRole('tab', {name: 'Map'}).click()
   }
 })

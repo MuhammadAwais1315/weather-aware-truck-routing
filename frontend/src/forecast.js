@@ -83,6 +83,38 @@ export function buildCheckpointGeoJSON(routes, departureTime, hoursOffset, { sel
   return { type: 'FeatureCollection', features }
 }
 
+// Trip checkpoint markers describe the assessment at each checkpoint's actual
+// ETA. Keep them independent from the exploratory slider's heatmap observations
+// so a slider time with no matching hourly forecast cannot hide route stops.
+export function buildTripCheckpointGeoJSON(routes, { selectedRouteId, includeAlternatives = true } = {}) {
+  const features = (routes || []).flatMap(route => (route.checkpoints || []).flatMap(checkpoint => {
+    if (!includeAlternatives && route.id !== selectedRouteId) return []
+    const coordinates = coordinateOf(checkpoint)
+    if (!coordinates) return []
+    const risk = checkpoint.risk || {}
+    const level = risk.level || risk.risk_label?.toLowerCase().replaceAll(' ', '_') || 'unknown'
+    const checkpointId = checkpoint.id || `${route.id}-${checkpoint.index ?? checkpoint.distance_miles}`
+    const weight = riskWeight(risk)
+    return [{
+      type: 'Feature',
+      id: `${route.id}:${checkpointId}`,
+      geometry: { type: 'Point', coordinates },
+      properties: {
+        checkpointId,
+        routeId: route.id,
+        routeName: route.name || String(route.id),
+        riskLabel: risk.risk_label || level.replaceAll('_', ' '),
+        riskLevel: weight == null ? 'unknown' : level,
+        riskWeight: weight,
+        riskScore: risk.final_risk_score ?? risk.score ?? null,
+        forecastTime: checkpoint.weather?.forecast_time || null,
+        tripEta: checkpoint.estimated_arrival_time || checkpoint.arrival_time || null,
+      },
+    }]
+  }))
+  return { type: 'FeatureCollection', features }
+}
+
 export function formatForecastTimestamp(timestamp, locale) {
   if (!timestamp) return 'Forecast time unavailable'
   const value = new Date(timestamp)

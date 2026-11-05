@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import { buildCheckpointGeoJSON } from '../forecast.js'
+import { buildCheckpointGeoJSON, buildTripCheckpointGeoJSON } from '../forecast.js'
 
 // Vite must emit MapLibre's module worker as a first-class asset. Without this,
 // its default relative URL points at a dependency file that Vercel does not serve.
 maplibregl.setWorkerUrl(mapLibreWorkerUrl)
 
 const ROUTE_COLORS = ['#258b65', '#3978c5', '#8b5fc7']
-const SOURCE_IDS = ['route-lines', 'weather-checkpoints', 'journey-endpoints']
+const SOURCE_IDS = ['route-lines', 'weather-checkpoints', 'trip-checkpoints', 'journey-endpoints']
 
 const safeCoordinate = point => {
   const coordinates = point?.coordinates || [point?.longitude, point?.latitude]
@@ -108,7 +108,7 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
       instance.addLayer({ id: 'route-casing', type: 'line', source: 'route-lines', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': ['case', ['get', 'recommended'], 11, ['get', 'selected'], 9, 6], 'line-opacity': ['case', ['get', 'visible'], 0.95, 0] } })
       instance.addLayer({ id: 'route-lines', type: 'line', source: 'route-lines', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['get', 'recommended'], 7, ['get', 'selected'], 5, 3], 'line-opacity': ['case', ['get', 'visible'], ['case', ['get', 'recommended'], 1, ['get', 'selected'], 0.95, 0.68], 0] } })
       instance.addLayer({ id: 'checkpoint-heat', type: 'heatmap', source: 'weather-checkpoints', maxzoom: 10, layout: { visibility: 'none' }, paint: { 'heatmap-weight': ['get', 'riskWeight'], 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 9, 2], 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 10, 9, 28], 'heatmap-opacity': 0.68, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(34,160,107,0)', 0.15, '#eab308', 0.4, '#f97316', 0.7, '#dc2626', 1, '#7f1d1d'] } })
-      instance.addLayer({ id: 'checkpoint-dots', type: 'circle', source: 'weather-checkpoints', layout: { visibility: 'visible' }, paint: { 'circle-radius': 6, 'circle-color': ['match', ['get', 'riskLevel'], 'no_travel', '#7f1d1d', 'severe', '#dc2626', 'high', '#f97316', 'moderate', '#eab308', 'low', '#22a06b', '#94a3b8'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': 0.98 } })
+      instance.addLayer({ id: 'checkpoint-dots', type: 'circle', source: 'trip-checkpoints', layout: { visibility: 'visible' }, paint: { 'circle-radius': ['case', ['==', ['get', 'riskLevel'], 'unknown'], 5, 6], 'circle-color': ['match', ['get', 'riskLevel'], 'no_travel', '#7f1d1d', 'severe', '#dc2626', 'high', '#f97316', 'moderate', '#eab308', 'low', '#22a06b', '#64748b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': 0.98 } })
       instance.addLayer({ id: 'endpoint-dots', type: 'circle', source: 'journey-endpoints', paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } })
       instance.addLayer({ id: 'endpoint-labels', type: 'symbol', source: 'journey-endpoints', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-allow-overlap': true }, paint: { 'text-color': '#20312b', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } })
       instance.on('click', 'checkpoint-dots', onCheckpointClick)
@@ -157,7 +157,10 @@ function updateMap(map, data, shouldFit) {
     selectedRouteId,
     includeAlternatives: layers.alternatives,
   })
-  const checkpointFeatures = checkpointData.features
+  const tripCheckpointData = buildTripCheckpointGeoJSON(routes, {
+    selectedRouteId,
+    includeAlternatives: layers.alternatives,
+  })
   const endpoints = []
   for (const [key, place, label, color] of [['origin', origin, 'Truck', '#23966c'], ['pickup', pickup, 'Pickup', '#3978c5'], ['destination', destination, 'Destination', '#dc513d']]) {
     const coordinate = safeCoordinate(place)
@@ -166,6 +169,7 @@ function updateMap(map, data, shouldFit) {
 
   map.getSource('route-lines').setData(featureCollection(routeFeatures))
   map.getSource('weather-checkpoints').setData(checkpointData)
+  map.getSource('trip-checkpoints').setData(tripCheckpointData)
   map.getSource('journey-endpoints').setData(featureCollection(endpoints))
   for (const id of ['route-lines', 'route-casing', 'checkpoint-dots']) {
     if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible')

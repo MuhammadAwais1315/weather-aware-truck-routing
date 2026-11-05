@@ -17,8 +17,9 @@ export default function RouteCard({route,summary,departureTime,active,onClick}){
  const coverage=summary?.weather_coverage_percentage
  const safetyLabel=safe?'SAFE':unknown?'UNKNOWN':'UNSAFE'
  const safetyDescription=safe?'Complete forecast · no No Travel segments':unknown?'Incomplete forecast coverage':`${noTravel} No Travel segment${noTravel===1?'':'s'}`
+ const routeSubtitle=safe?'Forecast assessed':unknown?'Forecast incomplete':'Weather restriction risk'
  return <button type="button" className={`comparison-card ${active?'selected':''} ${route.recommended?'recommended':''}`} onClick={onClick}>
-  <div className="comparison-card-heading"><span className="route-index">{String(route.id||'').match(/\d+/)?.[0]||'•'}</span><div className="route-title-group"><span className="route-name">{route.name||'Route option'}</span><span className="route-subtitle">{safetyDescription}</span></div>{route.recommended&&<span className="recommend-badge">BEST OPTION</span>}</div>
+  <div className="comparison-card-heading"><span className="route-index">{String(route.id||'').match(/\d+/)?.[0]||'•'}</span><div className="route-title-group"><span className="route-name">{route.name||'Route option'}</span><span className="route-subtitle">{routeSubtitle}</span></div>{route.recommended&&<span className="recommend-badge">BEST OPTION</span>}</div>
   <div className="route-primary-stats"><div><span>Distance</span><strong>{number(distance)}<small> mi</small></strong></div><div><span>Duration</span><strong>{duration(hours)}</strong></div></div>
   {route.legs?.length===2&&<div className="route-leg-summary"><span>Truck → pickup <b>{number(route.legs[0].distance_miles)} mi</b></span><span>Pickup → destination <b>{number(route.legs[1].distance_miles)} mi</b></span></div>}
   <div className="route-arrival"><span className="arrival-icon">◷</span><span><small>Estimated arrival</small><b>{arrivalTime(departureTime,hours)}</b></span></div>

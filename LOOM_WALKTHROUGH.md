@@ -1,70 +1,98 @@
-# Loom walkthrough script — Weather-Aware Truck Routing
+# WeatherRoute demo walkthrough
 
-**Target recording length:** about 8 minutes.  
-**Before recording:** start Django and Vite; use a valid ORS key if available; open browser DevTools Network/Console; do not show `.env` contents, keys, or account credentials. If recording against a public deployment, use the actual Vercel and Render URLs and verify them first. This repository has deployment configuration but no public deployment has been verified yet.
+**Target length:** 7–9 minutes (within the requested 5–10 minute range).
 
-## 0:00–0:40 — Intro and scope
+**Current frontend:** [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app)
 
-**Show:** dashboard at the top of the page.
+**Current API health:** [weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/)
 
-**Say:** “This is WeatherRoute, a weather-aware freight route planning dashboard. It compares actual alternatives from openrouteservice, estimates checkpoint weather at trip arrival times, scores weather and load risk, and ranks routes. The routing profile can help with truck routing, but no routing API can guarantee every height, axle, weight, or road restriction; drivers still need to verify official restrictions.”
+## Presenter preparation
 
-## 0:40–1:35 — Enter a journey and autocomplete
+- Open the live frontend and confirm it loads. Check the API health endpoint in another tab.
+- Have a three-location trip ready. The demo should begin with **truck location → pickup → destination**.
+- If the live provider is available, use a trip under 100 km where possible to improve the chance that ORS returns alternatives. ORS may still return fewer than three; show only the real provider routes.
+- To demonstrate elevated exposure, try **Buffalo, NY → Rochester, NY → Syracuse, NY**, 42,000 lb, 25-mile interval, and a near-term departure. Forecasts change: point out the risk shown by the current response, rather than promising a particular score.
+- An earlier forecast query suggested **Cape May, NJ → Philadelphia, PA → Atlantic City, NJ** near Nov 6, 2026 at 11:00 PM Tashkent time as a possible No Travel demonstration due to heavy rain. Use it only if the live checkpoint forecast actually crosses the configured threshold; otherwise explain the rule and show the test report's mocked boundary tests. Do not present mock data as live weather.
+- Close secret-bearing tabs. Never show `.env`, API keys, or provider account settings. Keep browser DevTools closed unless intentionally showing request/response behavior.
+- If a provider fails, show the visible error and state that the live call failed. Do not substitute test fixtures without labeling them.
 
-**Show:** origin and destination inputs, enter an origin and pause for suggestions, choose a suggestion, then choose a destination. Point out departure date/time, pounds load input, and checkpoint interval.
+## Script and screen actions
 
-**Say:** “Autocomplete suggestions come from the routing provider, while the backend resolves selected location labels through Nominatim. Departure is sent as an ISO-8601 timestamp with a timezone. The UI accepts pounds and the API converts that to short tons. The checkpoint selector supports exactly 10, 25, and 50 miles.”
+### 0:00–0:40 — Introduction
 
-If live credentials are unavailable, show the user-facing configuration error without replacing it with sample routes. Say: “This environment has no ORS credential, so a live journey request is expected to be rejected. I’ll use the automated test suite results to explain route-dependent behavior; those tests use clearly identified mocked provider responses.”
+**Show:** dashboard header and planner.
 
-## 1:35–2:25 — Actual route alternatives and comparison cards
+**Say:** “This is WeatherRoute, a weather-aware freight route planner. It compares route options from a routing provider, matches hourly weather to estimated checkpoint arrival times, calculates load-aware risk, and displays the results on a map and timeline. It is decision support: the route profile does not guarantee compliance with every truck or road restriction.”
 
-**Show:** submit a real journey when credentials are available; show the cards. Confirm only routes returned by the provider appear. Point to distance, duration, ETA, severe/high miles, average risk, and safety status. Point to the recommendation and why it was chosen.
+### 0:40–1:35 — Plan all three journey locations
 
-**Say:** “The backend asks for up to three alternatives and compares only the routes actually returned. Recommendation ordering is exact: fewest severe miles, then high miles, then lowest average risk, then shortest duration. A route containing a No Travel segment cannot be recommended; when all are unsafe, the interface says no safe route is available.”
+**Show:** truck location, pickup location, final destination, departure date/time, load weight, and checkpoint interval. Use autocomplete and choose a suggestion for each location.
 
-**Fallback:** show the route card and recommendation Playwright tests in the test report, explicitly identifying fixtures as test data.
+**Say:** “A journey has three distinct places: where the truck is now, where freight is picked up, and where it is delivered. The route goes from the truck to pickup, then continues from pickup to destination. I can choose a departure time, enter the load in pounds, and select 10, 25, or 50-mile checkpoint spacing.”
 
-## 2:25–3:20 — Checkpoint geometry and timing
+### 1:35–2:30 — Compare provider routes
 
-**Show:** select a 10-mile journey result if available. Point to start/destination and intermediate checkpoint positions; show checkpoint ETA and distance in the side list. If time permits, rerun with 25 and 50 miles.
+**Show:** submit the plan, then scroll to the route cards and recommendation explanation.
 
-**Say:** “Checkpoints are spaced along cumulative route distance and interpolated on the route geometry, rather than selected by coordinate index. Start and destination are included once. Provider segment durations are used when available; otherwise ETA uses documented proportional distance progress through total duration.”
+**Say:** “The backend asks OpenRouteService for up to three alternatives. The app displays only the routes the provider actually returns. Each card summarizes distance, driving duration, arrival estimate, severe miles, high miles, average risk, and forecast coverage. A route with elevated exposure is labeled as caution, a route with incomplete data as unknown, and a No Travel route is not presented as a safe recommendation.”
 
-## 3:20–4:20 — Weather units, risk rules and load
+Point out the exact ranking: “The comparison prioritizes fewest severe miles, then fewest high miles, then lowest distance-weighted average risk, then shortest duration.”
 
-**Show:** checkpoint details / popup for wind, rain, snow, risk and load override. If possible, change load and rerun to show classification changing.
+If only one route appears, say: “This provider request returned one route. ORS limits alternative-route calculations for trips over 100 km, so the application reports the actual result instead of manufacturing alternatives.”
 
-**Say:** “Open-Meteo hourly forecasts are matched to each checkpoint’s estimated arrival hour in UTC. Wind is converted from kilometers per hour to miles per hour; precipitation and rain from millimeters to inches; snowfall from centimeters to inches. Null or unavailable forecast values stay unknown. The risk engine takes the highest component risk and then applies the specified load rules. For example, 45 to under 55 mph with a load over 30,000 pounds becomes No Travel.”
+### 2:30–3:25 — Checkpoint placement and itinerary timeline
 
-## 4:20–5:25 — Map, route selection and checkpoint popup
+**Show:** switch to Timeline. Scroll to the itinerary graph and its events, then to the checkpoint outlook list.
 
-**Show:** all routes on the map, recommended route highlight, alternatives, origin/destination markers, risk colors, and click a checkpoint popup. Toggle alternative routes and checkpoint layers.
+**Say:** “The timeline plots the journey over time and lists departure, pickup, weather checkpoints, and arrival. Checkpoints are located by cumulative distance along the actual route geometry, not by raw coordinate index. ETA uses provider segment duration when available, with a documented proportional estimate as a fallback. The displayed place name comes from the reverse-geocoded checkpoint location when one is available.”
 
-**Say:** “The map uses GeoJSON coordinates in longitude, latitude order. It renders all available route geometries, highlights the recommended route, and colors checkpoint markers by final risk. Clicking a marker shows distance, ETA, the three weather intensities, classification and load override explanation. Layer controls update map visibility without creating a duplicate map instance.”
+### 3:25–4:20 — Weather details, units, and risk
 
-## 5:25–6:15 — Heatmap and exploratory forecast slider
+**Show:** select or open a checkpoint from the map/timeline and point to wind, rain, snow, risk, and explanation. Use a live elevated-risk route if the current forecast provides one.
 
-**Show:** enable weather heatmap and scrub slider at 0, 12, 24, 36, 48 hours. Point out timestamp and available checkpoint count.
+**Say:** “Open-Meteo hourly conditions are matched to each checkpoint's estimated arrival time. The service converts wind to miles per hour and rain and snow to inches per hour. Missing forecast values stay unknown; they are never silently changed to zero. The final checkpoint risk is the highest known weather risk, with the specified load overrides applied.”
 
-**Say:** “This slider is exploratory time relative to departure. It changes the displayed heatmap and checkpoint forecast selection; it does not alter the actual ETA used for trip risk. The heatmap weight is risk severity. When a forecast hour is missing, there is no fabricated zero-risk point; the UI reports that no checkpoint forecast is available for that selection.”
+Explain an example: “For instance, 42,000 pounds combined with wind in the 35-to-under-45 mph band raises that checkpoint to at least Severe. Rain above one inch per hour is No Travel under the assessment rules.”
 
-## 6:15–7:05 — Repeated submission, errors and responsiveness
+### 4:20–5:20 — Map and checkpoint popup
 
-**Show:** submit a second journey if provider credentials are available; briefly show loading. Optionally show a test/API error. Resize to mobile width and point out responsive form/cards/map.
+**Show:** switch to Map. Point to colored route lines, recommendation highlight, origin/pickup/destination, checkpoint markers, and layer toggles. Click a checkpoint.
 
-**Say:** “Repeated submissions clear prior results before loading new ones, and the request gate prevents stale responses from overwriting the latest journey. Loading, validation and provider failures have visible error states. Browser automation covers a second submission and mobile, tablet and desktop widths.”
+**Say:** “The map uses the returned GeoJSON route coordinates in longitude-latitude order. It can show the alternatives, checkpoints, and endpoints as separate layers. A checkpoint popup shows distance, ETA, weather values, risk classification, and any load-override explanation.”
 
-## 7:05–7:40 — Architecture and configuration
+### 5:20–6:05 — Weather heatmap and forecast slider
 
-**Show:** README architecture diagram, then backend app folders and frontend components. Do not open `.env`.
+**Show:** enable the weather heatmap. Move the slider to 0, 12, 24, 36, and 48 hours, pausing to show the selected time and checkpoint display.
 
-**Say:** “The React/Vite client talks to modular DRF endpoints. Routing orchestration composes separate geocoding, routing, checkpoint, weather, risk and recommendation services. Provider keys remain server-side in environment variables. Vercel and Render configuration is prepared, with exact production CORS and the Vite API URL set at deployment time.”
+**Say:** “The slider explores forecast time from departure through 48 hours. Changing it updates the exploratory checkpoint weather and heatmap; it does not change the weather assessment at the actual ETA stored for the trip. If an hour is unavailable, the map reports missing forecast coverage rather than drawing a zero-risk value.”
 
-## 7:40–8:10 — QA results and close
+### 6:05–6:50 — Loading, failures, repeat plans, and responsive layout
 
-**Show:** `QA_TEST_REPORT.md` summary and deployment checklist.
+**Show:** if time and provider quota allow, submit a second journey and show the loading transition and replacement results. Resize to tablet or mobile width.
 
-**Say:** “The latest executed automated run passed 101 backend tests, 29 frontend tests and 4 Playwright tests. Live Nominatim and Open-Meteo smoke requests succeeded. Live route analysis and public deployment are not claimed as verified until an ORS key is configured and the Vercel/Render services are deployed and tested publicly. The test report separates live provider checks from mocked integration tests.”
+**Say:** “A new submission replaces old route and map state so stale markers do not remain. Validation, loading, and provider errors have visible states. The automated browser tests also cover repeated submissions and mobile, tablet, and desktop layouts.”
 
-**Close:** “That’s WeatherRoute: real route alternatives, ETA-aligned weather, transparent risk scoring, and an interactive map for planning review.”
+### 6:50–7:35 — Architecture and configuration
+
+**Show:** README architecture diagram, then the `frontend/` and `backend/apps/` trees. Keep environment files closed.
+
+**Say:** “The frontend is React and Vite, and the backend is Django REST Framework. Separate backend services handle geocoding, directions, checkpoint generation, weather, risk, and recommendations. Nominatim resolves places, OpenRouteService provides autocomplete and routes, and Open-Meteo provides hourly forecasts. Provider credentials stay in backend environment variables.”
+
+### 7:35–8:10 — QA, limitations, close
+
+**Show:** `TESTING.md` and `QA_TEST_REPORT.md`, then return to the dashboard.
+
+**Say:** “The repository includes backend and frontend automated suites, with provider behavior mocked in tests. The reports distinguish automated coverage from live provider and production checks. Alternative availability and forecast conditions depend on external providers. Always verify truck restrictions and official advisories before dispatch.”
+
+**Close:** “WeatherRoute brings real provider routes, ETA-based weather, transparent exposure metrics, and a map and timeline into one planning workflow.”
+
+## Optional No Travel rule explanation
+
+If live weather does not produce a No Travel checkpoint during recording, use this short explanation and label any test fixture as mocked: “The risk engine marks wind at or above 55 mph as No Travel for every load; wind from 45 to under 55 mph is No Travel above 30,000 pounds; rain above 1 inch per hour and snow above 3 inches per hour are also No Travel. When all complete-coverage routes are unsafe, the recommendation reads ‘No safe route available.’”
+
+## Post-recording checklist
+
+- Confirm the recording is 5–10 minutes and the audio is clear.
+- Verify no credentials, `.env` contents, account details, or personal notifications appear.
+- Check that every route shown was returned by the API; do not call mock fixtures live data.
+- Keep the truck-restriction and ETA/HOS limitations in the closing narration.

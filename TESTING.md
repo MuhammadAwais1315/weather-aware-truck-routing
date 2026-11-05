@@ -1,17 +1,17 @@
 # Testing and coverage
 
-## Latest executed results
+## Recorded executed results
 
-These are real runs in the local QA environment on 2026-11-03. Provider calls are mocked in automated tests; only the separate smoke checks documented in [QA_TEST_REPORT.md](QA_TEST_REPORT.md) used live Nominatim/Open-Meteo services.
+The QA report contains a complete run recorded on 2026-11-03. The later frontend risk-label change was verified on 2026-11-05; suite counts are listed separately by run so different executions are not combined into a misleading single total. Provider calls in automated tests are mocked; live provider and deployment checks are described in [QA_TEST_REPORT.md](QA_TEST_REPORT.md).
 
 | Suite | Tests | Passed | Failed | Skipped | Coverage |
 |---|---:|---:|---:|---:|---|
-| Django backend | 101 | 101 | 0 | 0 | **85.0%** Coverage.py total (line and branch measurement; 856 statements, 274 branches) |
-| Vitest + React Testing Library | 29 | 29 | 0 | 0 | Not instrumented; no frontend coverage provider configured |
-| Playwright browser | 4 | 4 | 0 | 0 | Browser behavior tests, not source coverage |
-| **Total** | **134** | **134** | **0** | **0** | Backend measured; frontend coverage percentage unavailable |
+| Django backend (2026-11-03; see QA report) | 104 | 104 | 0 | 0 | Latest recorded backend run; coverage was not recalculated after regression tests |
+| Vitest + React Testing Library (2026-11-05) | 48 | 48 | 0 | 0 | Not instrumented; no frontend coverage provider configured |
+| Playwright browser (2026-11-05) | 5 | 5 | 0 | 0 | Browser behavior tests, not source coverage |
+| Backend coverage run (2026-11-03, 101-test run) | — | — | — | — | **85.0%** Coverage.py total; line and branch measurement (856 statements, 274 branches) |
 
-The suite covers geocoding/routing provider behavior, route counts, checkpoint geometry and ETA, hourly weather matching/conversions, risk thresholds/load overrides, distance-weighted recommendations, API validation/errors, form/API integration, map/popups, forecast slider, repeat submission and mobile/tablet/desktop widths. It is not a substitute for live route testing; a valid ORS key is required for that.
+The suites cover geocoding/routing provider behavior, route counts, checkpoint geometry and ETA, hourly weather matching/conversions, risk thresholds/load overrides, distance-weighted recommendations, API validation/errors, form/API integration, map/popups, forecast slider, repeat submission and mobile/tablet/desktop widths. They are not a substitute for live route testing; a valid ORS key is required for that. For deployment and live smoke outcomes, use the dated scenario report.
 
 ## Windows PowerShell commands
 

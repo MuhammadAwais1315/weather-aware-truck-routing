@@ -1,53 +1,95 @@
-# Weather-Aware Truck Routing
+# WeatherRoute — Weather-Aware Truck Routing
 
-WeatherRoute is a responsive React dashboard backed by Django REST Framework. It accepts a freight journey, requests real alternatives from openrouteservice, creates checkpoints along the returned route geometry, matches Open-Meteo hourly forecasts to checkpoint ETAs, scores weather/load risk, and ranks safe alternatives. MapLibre displays returned routes, risk-colored checkpoints and an exploratory 0–48-hour weather heatmap.
+WeatherRoute helps freight planners compare real road-route options with weather forecasts at estimated checkpoint arrival times. Plan a three-stop journey—truck location → pickup → destination—then review route exposure, load-aware risk, and a time-based map forecast.
 
-> **Assessment/safety note:** This is a planning aid. A configured `driving-hgv` profile does not guarantee that a route satisfies every truck height, axle-weight, hazmat, seasonal, or road restriction. Verify official restrictions and advisories before dispatch.
+> **For planning support only.** A configured HGV routing profile does not guarantee compliance with vehicle height, axle-weight, road, seasonal, hazmat, or other restrictions. Verify official restrictions and advisories before dispatch. Forecasts and ETAs are estimates, not driver logs or Hours of Service calculations.
 
-## Features
+## Product tour
 
-- Truck current location, freight pickup, and final destination autocomplete; departure date/time, load weight in pounds, and 10/25/50-mile checkpoint interval.
-- Each returned provider alternative routes in order from truck to pickup to final destination. The pickup is included as a route checkpoint, with per-leg distance and estimated arrival summaries.
-- Driver-friendly, turn-by-turn directions for both route legs, with provider maneuver text, road name, distance, and estimated maneuver time.
-- Up to three **provider-returned** ORS driving alternatives. The application never fabricates missing alternatives.
-- Nominatim forward geocoding and ORS Pelias autocomplete.
-- Distance-based checkpoints on actual route geometry, including origin and destination; cumulative-distance interpolation and segment duration ETAs when the provider supplies them.
-- Hourly weather matched to each checkpoint ETA. Values are normalized to wind mph and rain/snow inches per hour. Missing forecast values remain unknown.
-- Central weather bands and load overrides, distance-weighted severe/high miles, and recommendation ordering: severe miles, high miles, average risk, then duration. Routes with No Travel segments are not eligible for recommendation.
-- Interactive MapLibre routes, endpoint markers, checkpoint popups/layers, and heatmap exploration from 0 to 48 hours after departure. Exploratory time does not change trip ETA.
-- Map/Timeline switch with a day-by-day estimated driving timeline, actual checkpoint arrival times, weather and risk. It does not invent rest stops or represent driver duty logs/HOS compliance.
+### Plan a three-stop journey
+
+![WeatherRoute journey form with truck location, pickup, destination, departure, load and checkpoint interval](docs/screenshots/journey-planner.png)
+
+Enter a truck's current location, the freight pickup, and the final destination. Set departure date and time, load in pounds, and checkpoints every 10, 25, or 50 miles.
+
+### Inspect the route map and forecast
+
+![Route map with checkpoint markers and the 0–48 hour forecast exploration slider](docs/screenshots/map-heatmap.png)
+
+Review actual route geometry, endpoint markers, weather checkpoints, map layers, and the exploratory forecast slider. The slider changes the displayed forecast selection; it does not rewrite trip checkpoint ETAs.
+
+### Follow the estimated itinerary
+
+![Estimated trip timeline with stop and weather checkpoint events](docs/screenshots/timeline.png)
+
+The timeline shows departure, pickup, forecast checkpoints, and arrival with estimated local times and weather risk. Checkpoint labels use reverse-geocoded place names when available; when a provider has no nearby name, coordinates remain the fallback.
+
+## What it does
+
+- Geocodes truck, pickup, and destination locations.
+- Requests up to three alternatives from openrouteservice (ORS), preserving only routes actually returned by the provider.
+- Builds 10/25/50-mile checkpoints along cumulative route distance with coordinate interpolation and estimated arrival times.
+- Retrieves Open-Meteo hourly wind, rain, and snow for checkpoint coordinates and ETAs, with conversions to mph and inches/hour.
+- Applies the assessment weather thresholds and load overrides; unknown weather stays unknown.
+- Calculates severe/high exposure miles from actual route segment distances and ranks routes by severe miles, high miles, average risk, then duration.
+- Shows route cards, route directions, a MapLibre map, risk-colored checkpoints, popups, a 0–48-hour weather heatmap, and an estimated route timeline.
+- Handles incomplete forecasts, provider failures, repeated submissions, loading, and validation states.
+
+### Route alternatives are provider-limited
+
+ORS alternatives are limited by the provider (including a 100 km limit for alternative-route calculations). Longer trips may return only one route. If ORS returns one or two alternatives, WeatherRoute shows one or two; it does not invent more. Alternative availability can also depend on provider coverage, route complexity, profile, API limits, and key permissions.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  UI[React + Vite dashboard] -->|Axios JSON| API[Django REST API]
-  API --> GEO[Geocoding service / Nominatim]
-  API --> ORS[Routing service / ORS]
+  UI[React + Vite] -->|Axios / JSON| API[Django REST Framework]
+  API --> GEO[Geocoding service]
+  GEO --> NOM[Nominatim]
+  GEO --> ORS[ORS Pelias autocomplete]
+  API --> ROUTE[Routing service / ORS Directions]
   API --> CP[Checkpoint generator]
-  CP --> WX[Weather service / Open-Meteo]
+  CP --> WX[Open-Meteo weather service]
   WX --> RISK[Weather and load risk engine]
-  RISK --> REC[Distance-weighted recommendation]
+  RISK --> REC[Distance-weighted recommendations]
   REC --> API
   API --> UI
-  UI --> MAP[MapLibre routes, markers and heatmap]
+  UI --> MAP[MapLibre routes, checkpoints, heatmap]
 ```
 
-The frontend is under `frontend/src`: `PlannerForm` owns journey inputs, `api.js` is the Axios client, `contracts.js` checks the response shape, `forecast.js` computes slider timestamps and checkpoint GeoJSON, `activityTimeline.js` builds day/segment data from route checkpoint ETAs, `TripActivityTimeline` displays estimated route activity, and `MapView` owns one MapLibre map instance and updates its sources. The backend is under `backend`: `apps/routing` validates requests and orchestrates planning, while `geocoding`, `checkpoints`, `weather`, `risk_engine` and `recommendations` keep domain logic isolated. `services` contains shared HTTP, route-provider and DRF exception handling. Provider credentials are only read by the backend.
+### Repository layout
+
+```text
+backend/
+  apps/                 Django domain apps: routing, geocoding, weather,
+                        checkpoints, risk_engine, recommendations
+  config/               Settings, URL routing, WSGI/ASGI
+  services/              Shared HTTP/provider/exception utilities
+  tests/                 Backend tests and fixtures
+  manage.py
+frontend/
+  src/                  React app, journey form, route cards, map and timeline
+  tests/                Vitest and React Testing Library
+  e2e/                  Playwright browser tests
+docs/screenshots/       README product screenshots
+render.yaml             Optional Render backend blueprint
+```
+
+The React client submits three locations and journey options to the DRF planning API. Backend orchestration composes separate provider clients and domain services. The browser receives normalized route GeoJSON and checkpoint data. Map coordinates follow GeoJSON order `[longitude, latitude]`; API checkpoint latitude/longitude are also available as named fields. Provider credentials remain on the backend.
 
 ## Requirements
 
-- Windows 10/11 with PowerShell 5.1+ or PowerShell 7+
-- Python 3.10+ (Render blueprint currently pins 3.12.8)
+- Windows 10/11 and PowerShell 5.1+ or PowerShell 7+
+- Python 3.10+ (the deployment blueprint specifies Python 3.12.8)
 - Node.js 20+ and npm
-- Internet access for provider APIs and CARTO Voyager basemap tiles
-- An [openrouteservice API key](https://openrouteservice.org/dev/#/signup) for autocomplete and directions
+- An [openrouteservice API key](https://openrouteservice.org/dev/#/signup) for autocomplete and route requests
+- Internet access for geocoding, routing, weather, and map tiles
 
-Open-Meteo requires no application API key. Nominatim is used only for explicit geocoding, not autocomplete; observe the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). The local geocoder throttles and caches requests in-process. Forecast/geocoding caches are in-memory, per process, and are lost at restart.
+Open-Meteo does not require an application API key. Nominatim is used for explicit geocoding; autocomplete uses ORS Pelias. Observe the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/). The current geocoding and weather caches are in-memory and process-local.
 
-## Install and run on Windows PowerShell
+## Run locally on Windows PowerShell
 
-Run commands from the repository root unless noted. Keep the backend and frontend in separate PowerShell windows.
+Run the commands from the repository root unless indicated. Use two PowerShell windows so Django and Vite can run together.
 
 ### 1. Configure the backend
 
@@ -56,9 +98,9 @@ Copy-Item backend/.env.example backend/.env
 notepad backend/.env
 ```
 
-Put your ORS key in `OPENROUTESERVICE_API_KEY`. Keep `backend/.env` private; `.env` files are git-ignored. The local sample enables `DEBUG=True` and uses local-only hosts/origins. Never use those settings for production.
+Set `OPENROUTESERVICE_API_KEY` in `backend/.env`. Keep this secret out of the frontend, source control, screenshots, and browser DevTools. The local example uses `DEBUG=True`; it is for local development only.
 
-### 2. Install and start Django
+### 2. Install and run Django
 
 ```powershell
 cd backend
@@ -67,13 +109,19 @@ py -3 -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 python manage.py check
-python manage.py test tests
 python manage.py runserver 127.0.0.1:8000
 ```
 
-If activation is blocked for this PowerShell process, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then activate again. Health check: <http://127.0.0.1:8000/api/health/>.
+If PowerShell blocks virtual environment activation, allow it for this terminal only and activate again:
 
-### 3. Configure and start Vite
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Health endpoint: <http://127.0.0.1:8000/api/health/>.
+
+### 3. Install and run React + Vite
 
 In a second PowerShell window, from the repository root:
 
@@ -84,50 +132,36 @@ npm ci
 npm run dev
 ```
 
-Open the Vite URL printed in the terminal (normally <http://localhost:5173/>). `VITE_API_BASE_URL` is compiled into the browser bundle; it must be a public HTTPS API URL in production and must not contain a secret.
+Open the local URL printed by Vite, normally <http://localhost:5173/>. `VITE_API_BASE_URL` is public build-time configuration and must point to the API root ending in `/api`. Never put an API key or other secret in a `VITE_*` variable.
 
-### 4. Build and run tests
+### Stop the local servers
 
-```powershell
-cd frontend
-npm run test
-npm run test:e2e
-npm run test:all
-npm run build
-```
+Press `Ctrl+C` in each terminal running Django and Vite. The environment files stay local and can be reused next time.
 
-For test scope, latest counts, measured backend coverage, limitations, and follow-up, see [TESTING.md](TESTING.md). For a live browser smoke against an already-running local API and Vite instance:
+## Configuration
 
-```powershell
-npm run qa:live
-```
+Use the examples for each runtime: [`backend/.env.example`](backend/.env.example) and [`frontend/.env.example`](frontend/.env.example). The root [`.env.example`](.env.example) is a combined reference.
 
-The live smoke needs a configured ORS key. Provider-dependent automated tests mock external responses. See [QA_TEST_REPORT.md](QA_TEST_REPORT.md) for the latest executed results, their mocked/live boundary, and known build/runtime warnings. Backend coverage tooling is listed in `backend/requirements-dev.txt`; run `coverage run manage.py test tests` followed by `coverage report -m` after installing development requirements. The frontend suite currently has no coverage provider configured, so its passing test count is not a line/branch coverage percentage.
-
-## Environment reference
-
-Examples are split by runtime: [`backend/.env.example`](backend/.env.example) and [`frontend/.env.example`](frontend/.env.example). The root `.env.example` is retained as a combined quick reference. Never put `OPENROUTESERVICE_API_KEY` in a `VITE_*` variable or frontend file; Vite variables are public.
-
-| Variable | Runtime | Purpose |
+| Variable | Where | Description |
 |---|---|---|
-| `DJANGO_SECRET_KEY` | Backend | Django signing key. Required when `DEBUG=False`; Render generates one through the blueprint. |
-| `DEBUG` | Backend | Django debug mode. `False` in production. |
-| `APP_VERSION` | Backend | Version returned from health endpoint. |
-| `ALLOWED_HOSTS` | Backend | Comma-separated Django host allowlist; Render host is also read from `RENDER_EXTERNAL_HOSTNAME`. |
-| `CORS_ALLOWED_ORIGINS` | Backend | Comma-separated exact browser origins allowed to call the API. Set the deployed Vercel origin, including `https://`, in Render. |
-| `LOG_LEVEL` | Backend | Python root log level, usually `INFO`. |
-| `OPENROUTESERVICE_API_KEY` | Backend | ORS Pelias autocomplete and Directions API key. Required for a complete journey. |
-| `OPENROUTESERVICE_PROFILE` | Backend | Routing profile; default `driving-hgv`. |
-| `NOMINATIM_BASE_URL` | Backend | Nominatim search API URL. |
-| `VITE_API_BASE_URL` | Frontend build | API root ending in `/api`, e.g. `https://your-api.onrender.com/api`. Local default is `http://127.0.0.1:8000/api`. |
+| `OPENROUTESERVICE_API_KEY` | Backend secret | Required for autocomplete and route requests. Never expose to browser code. |
+| `OPENROUTESERVICE_PROFILE` | Backend | Routing profile; default is `driving-hgv`. |
+| `NOMINATIM_BASE_URL` | Backend | Nominatim search endpoint. |
+| `DJANGO_SECRET_KEY` | Backend secret | Django signing key; required with `DEBUG=False`. |
+| `DEBUG` | Backend | Use `False` in production. |
+| `ALLOWED_HOSTS` | Backend | Comma-separated Django host allowlist. |
+| `CORS_ALLOWED_ORIGINS` | Backend | Comma-separated exact frontend origins, including scheme and no path. |
+| `APP_VERSION` | Backend | Version string returned by `/api/health/`. |
+| `LOG_LEVEL` | Backend | Python log level, usually `INFO`. |
+| `VITE_API_BASE_URL` | Frontend build | API base URL ending with `/api`; local default is `http://127.0.0.1:8000/api`. |
 
-## API documentation
+## API overview
 
-All API paths are relative to the API root (`/api`). JSON errors use `{"error":"...","code":"..."}`. Validation errors may also include a `details` object. Upstream services have bounded timeouts and are translated to gateway/service error responses; missing credentials return HTTP 503.
+API paths below are relative to `/api`. The API currently does not require user authentication. Errors use JSON with an `error` and `code`, and may include validation `details`.
 
 ### `GET /api/health/`
 
-No authentication. Returns application liveness/version:
+Returns application health and version:
 
 ```json
 {"status":"ok","version":"1.0.0"}
@@ -135,96 +169,120 @@ No authentication. Returns application liveness/version:
 
 ### `GET /api/geocode/autocomplete/?q=<text>`
 
-Requires ORS key. Queries shorter than three characters return an empty suggestions array.
+Returns address suggestions from ORS Pelias. Queries shorter than three characters return no suggestions. Requires the ORS key.
 
 ```json
-{"suggestions":[{"label":"New York, NY, USA","longitude":-74.006,"latitude":40.713}]}
+{"suggestions":[{"label":"Buffalo, NY, USA","longitude":-78.8784,"latitude":42.8864}]}
 ```
-
-Coordinates in suggestion objects are explicit `longitude` and `latitude` fields. The browser submits the selected label; the plan endpoint resolves it through Nominatim.
 
 ### `GET /api/geocode/?q=<text>`
 
-Nominatim forward geocode; requires at least three characters.
-
-```json
-{"label":"New York, United States","latitude":40.7127281,"longitude":-74.0060152}
-```
+Resolves a selected location using Nominatim and returns its label and coordinates.
 
 ### `POST /api/plan/`
 
-Runs geocoding of the truck, pickup and final destination; requests routes through the pickup; then calculates checkpoints, weather-at-ETA, risk and recommendations. Departure time must be ISO-8601 with `Z` or explicit UTC offset. Load is in **short tons at the API boundary**; the browser accepts pounds and divides by 2,000. Supported interval values are integer miles 10, 25 or 50.
-
-Request:
+Geocodes all three locations, requests routes through pickup, then generates checkpoints and attaches weather, risk, and recommendation results.
 
 ```json
 {
-  "origin":"New York, NY",
-  "pickup":"Hartford, CT",
-  "destination":"Chicago, IL",
-  "departure_time":"2026-11-03T14:00:00Z",
-  "load_weight_tons":21,
-  "checkpoint_interval_miles":25
+  "origin": "Buffalo, NY, USA",
+  "pickup": "Rochester, NY, USA",
+  "destination": "Syracuse, NY, USA",
+  "departure_time": "2026-11-06T20:00:00Z",
+  "load_weight_tons": 21,
+  "checkpoint_interval_miles": 25
 }
 ```
 
-Response top-level fields include `origin`, `pickup`, `destination`, `departure_time`, `load_weight_tons`, `checkpoint_interval_miles`, `routes`, `recommendation`, `recommendation_status`, `recommended_route_id`, `ranked_routes`, `route_summaries`, `ranking_explanation` and `routing_notice`. Each route includes two `legs` (`origin → pickup`, then `pickup → destination`) and checkpoints that include the pickup location. Each leg includes provider-supplied turn-by-turn `steps` with instruction text, road name, distance and duration.
+`departure_time` must be ISO-8601 with `Z` or a UTC offset. The frontend accepts pounds and converts to short tons for the API (`42,000 lb = 21 tons`). Supported intervals are 10, 25, and 50 miles.
 
-Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate order `[longitude, latitude]`), `distance_miles`, `duration_hours`, provider summary, `checkpoints`, `metrics`, and `recommended`. A checkpoint includes `id`, `latitude`, `longitude`, `coordinates`, `distance_from_origin_miles`, `distance_to_next_checkpoint_miles`, `progress_percent`, timezone-aware `estimated_arrival_time`, `weather`, and `risk`. Weather reports `available`, `forecast_time`, requested/matched time, nullable values (`wind_speed_mph`, `rain_inches_per_hour`, `snowfall_inches_per_hour`) and `units`. Risk includes component risks, `risk_label`, `final_risk_score`, `load_override`, and `explanation`. Route metrics include severe/high miles, distance-weighted average risk and No Travel segments. See `frontend/src/contracts.js` and the mocked API fixtures in `frontend/tests/fixtures.js` for the runtime response contract.
+Each route response includes route ID/name, GeoJSON `LineString` geometry, distance, duration, two route legs, ETA checkpoints, risk metrics, and recommendation state. Each checkpoint has coordinates, distance/progress, estimated arrival, nullable weather values, forecast availability, and risk details. Route metrics include severe miles, high miles, average risk, No Travel segments, and forecast coverage. See [`frontend/src/contracts.js`](frontend/src/contracts.js) and [`backend/apps/routing/serializers.py`](backend/apps/routing/serializers.py) for the concrete response contract.
 
-## Assessment rules implemented
+## Risk and recommendation rules
 
-- Wind (mph): `<25` Low; `25–<35` Moderate; `35–<45` High; `45–<55` Severe; `>=55` No Travel.
-- Rain (inches/hour): `<0.10` Low; `0.10–<0.25` Moderate; `0.25–<0.50` High; `0.50–1.00` Severe; `>1.00` No Travel.
-- Snow (inches/hour): `<0.5` Low; `0.5–<1.0` Moderate; `1.0–<2.0` High; `2.0–3.0` Severe; `>3.0` No Travel.
-- Load rules: wind `>=55 mph` is No Travel for every load; wind `45–54 mph` with load `>30,000 lb` is No Travel; wind `35–44 mph` with load `>40,000 lb` is at least Severe.
-- The checkpoint final risk is the highest of known weather-component risks and any applied load override. If every weather component is missing, risk is `Unknown`/null, not Low.
-- Segment risk applies over the distance from one checkpoint to the next. The last destination point contributes no extra miles. Recommendation priorities are severe miles, high miles, average risk, and travel duration. A route with any No Travel segment cannot be recommended. Routes with incomplete forecast coverage are reported as unknown and cannot be labeled safe or recommended. Route summaries include weather coverage and unknown-weather miles; if every complete-coverage route is unsafe, the recommended route ID is null and the explanation is `No safe route available`.
+| Weather | Low | Moderate | High | Severe | No Travel |
+|---|---:|---:|---:|---:|---:|
+| Wind (mph) | `<25` | `25–<35` | `35–<45` | `45–<55` | `>=55` |
+| Rain (in/hour) | `<0.10` | `0.10–<0.25` | `0.25–<0.50` | `0.50–1.00` | `>1.00` |
+| Snow (in/hour) | `<0.5` | `0.5–<1.0` | `1.0–<2.0` | `2.0–3.0` | `>3.0` |
 
-## Deployment preparation
+Load rules: wind `>=55 mph` is No Travel for every load; wind `45–<55 mph` with load `>30,000 lb` is No Travel; wind `35–<45 mph` with load `>40,000 lb` is at least Severe. The highest known weather or load risk determines checkpoint risk. If all weather values are unavailable, the checkpoint risk is **Unknown**, not zero.
 
-The project is pushed to the private [GitHub repository](https://github.com/MuhammadAwais1315/weather-aware-truck-routing) on `main`. Both the [React frontend](https://weather-aware-truck-routing-psi.vercel.app/) and [Django API](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/) are deployed to Vercel. The OpenRouteService production key is configured as a Vercel secret. A real New York-to-Boston journey completed in the public dashboard: the API returned one provider route, six ETA-based checkpoints with weather, a recommendation, route geometry and the map rendered without browser console or HTTP errors. The trip exceeds openrouteservice's 100 km alternative-route limit, so its API returned only one actual route; the application explains this limit and does not fabricate alternatives.
+Risk miles use actual segment distances between checkpoints. Route recommendation order is: (1) fewest severe miles, (2) fewest high miles, (3) lowest distance-weighted average risk, (4) shortest duration. No Travel routes are excluded. Incomplete forecast coverage is marked unknown/incomplete and is not called safe. If all adequately assessed options contain No Travel segments, the API returns **No safe route available**.
 
-### Render backend (alternative)
+## Weather and time handling
 
-The root [`render.yaml`](render.yaml) defines a Python web service rooted at `backend/`, installs requirements, applies Django migrations at start, serves WSGI with Gunicorn, and exposes `/api/health/` as the health check. In Render, create a Blueprint from the connected repository. Set the prompted `OPENROUTESERVICE_API_KEY` and `CORS_ALLOWED_ORIGINS` values in Render. Once Vercel provides its production domain, set `CORS_ALLOWED_ORIGINS=https://<your-vercel-domain>` (exact origin, no path or trailing slash), save and deploy. Render supplies `RENDER_EXTERNAL_HOSTNAME`; settings add that service host to Django's host allowlist. Keep `DEBUG=false` and do not paste secrets into `render.yaml`.
+Open-Meteo hourly weather is matched to each checkpoint's estimated arrival time. Source wind in km/h converts to mph (`1 km/h = 0.621371192237334 mph`); precipitation/rain in mm converts to inches (`1 mm = 1/25.4 in`); snowfall in cm converts to inches (`1 cm = 1/2.54 in`). The inches/hour display represents accumulation during the source's preceding hourly interval. Arrival datetimes are normalized to UTC for matching; missing arrays, null values, and unavailable hours remain missing. The 0–48-hour slider is an exploratory forecast time distinct from the trip's checkpoint ETAs.
 
-The app currently has no user/account or durable business data, so no production database is required for the current feature set. Django's installed built-in auth/contenttypes migrations are run by the Render start command. Per-process geocoding/weather caches are ephemeral and not shared between workers.
+## Testing and quality checks
 
-### Vercel backend
+Run the automated suites from separate terminals (or stop Vite/Django first if the E2E runner needs their ports):
 
-The Vercel API project `weather-aware-truck-routing-api` is rooted at `backend/`, where [`backend/vercel.json`](backend/vercel.json) sets a 180-second function duration and excludes test/cache files. Vercel detects Django from `manage.py`, and Python 3.12 is declared in `backend/.python-version`. Production has `DEBUG=False`, a generated secret, an exact CORS allow-origin for the frontend, and `OPENROUTESERVICE_API_KEY` set as a secret. The runtime derives its deployment host from Vercel system variables. The deployed API health check returns `{"status":"ok","version":"1.0.0"}`. The local `render.yaml` remains an alternative backend host configuration.
+```powershell
+# Backend
+cd backend
+.\.venv\Scripts\Activate.ps1
+python manage.py check
+python manage.py test tests --verbosity 1
+```
 
-### Vercel frontend
+```powershell
+# Frontend unit/component tests, browser tests, and production build
+cd frontend
+npm ci
+npm run test
+npm run test:e2e
+npm run build
+```
 
-The Vercel frontend project `weather-aware-truck-routing` is rooted at `frontend`; [`frontend/vercel.json`](frontend/vercel.json) provides SPA fallback. Its Production environment now includes `VITE_API_BASE_URL=https://weather-aware-truck-routing-api-kappa.vercel.app/api`; Vite embeds this public API URL at build time. Variables beginning `VITE_` are public configuration; never place provider keys there. The production frontend origin is allowed in backend CORS. Deployments were made via CLI; GitHub automatic deployments are not configured.
+For backend coverage, install `backend/requirements-dev.txt`, then run:
 
-### Production verification checklist
+```powershell
+coverage run --data-file=.coverage manage.py test tests
+coverage report --data-file=.coverage -m
+```
 
-Production health, CORS, and a complete browser journey have been verified. A New York-to-Boston production request returned one actual route (the trip is over the provider's 100 km alternatives limit), 6/6 checkpoints with weather, recommendation `route-1`, and a rendered MapLibre canvas. The MapLibre worker loads from a Vite-emitted asset and the browser check reported no console or HTTP errors. Recheck the public API and UI with:
+For suite scope, actual run dates/counts, and live-versus-mocked details, read [`TESTING.md`](TESTING.md) and [`QA_TEST_REPORT.md`](QA_TEST_REPORT.md). Automated provider tests use mocks; they do not prove that a live provider is currently available. An optional live browser smoke (`npm run qa:live`) requires both local servers and a valid ORS key.
+
+## Deployment status
+
+The project source is in the private GitHub repository [MuhammadAwais1315/weather-aware-truck-routing](https://github.com/MuhammadAwais1315/weather-aware-truck-routing), branch `main`.
+
+- **Frontend:** [https://weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app)
+- **Django API health:** [https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/)
+- The prior `weather-aware-truck-routing.vercel.app` alias is assigned to an existing deployment and did not accept reassignment during the last deployment; use the frontend URL above for the latest build.
+- A live production New York–Boston journey previously returned one actual route and rendered its checkpoints/map. ORS alternatives are unavailable for that longer than 100 km request, so the UI reported one route instead of fabricating alternatives.
+- [`render.yaml`](render.yaml) prepares Render as an alternative backend host; the current production API is on Vercel. Render is not claimed as a verified deployment.
+
+### Deployment configuration
+
+For Vercel, configure `VITE_API_BASE_URL` as a Production environment variable on the frontend project, then redeploy because Vite embeds it at build time. Set `OPENROUTESERVICE_API_KEY`, `DJANGO_SECRET_KEY`, `DEBUG=False`, host settings, and exact `CORS_ALLOWED_ORIGINS` on the backend project. Keep secrets server-side. Vercel-specific configuration is in [`frontend/vercel.json`](frontend/vercel.json) and [`backend/vercel.json`](backend/vercel.json). `render.yaml` is an optional Render Blueprint configuration.
+
+Useful live checks:
 
 ```powershell
 Invoke-RestMethod https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/
 Invoke-WebRequest https://weather-aware-truck-routing-psi.vercel.app/
 ```
 
-The current live browser verification used interval 50; intervals 10, 25 and 50 are covered by backend and frontend automated tests. The Playwright UI suite covers route rendering, checkpoints/popups, forecast slider changes, loading/errors, repeat submissions and responsive widths. For further live checks, inspect ORS geometry/count, checkpoint ETA/weather, route layers, popups and heatmap at several forecast offsets; test missing forecasts and unavailable routes. A successful health check alone does not verify the workflow.
+A health response verifies only API liveness, not the full route/weather workflow. Provider quota/key access, browser CORS, and a live itinerary should be checked separately after configuration changes.
 
-Deployment format follows [Vercel's Django guide](https://vercel.com/docs/frameworks/full-stack/django), [Vercel Vite guidance](https://vercel.com/docs/frameworks/frontend/vite), and the [Render Django deployment guide](https://render.com/docs/deploy-django). See also [Render Blueprint environment variables](https://render.com/docs/blueprint-spec) and [Vercel environment variables](https://vercel.com/docs/environment-variables).
+## Known limitations
 
-## Known limitations and risks
+- ORS may return fewer than three routes; its alternative calculation has distance and provider constraints.
+- HGV routing does not guarantee regulatory vehicle or road restriction compliance.
+- Forecast coverage is finite; unknown values remain unknown. Open-Meteo availability/horizon can change.
+- Checkpoint weather requests and external provider quotas can increase planning latency, especially with 10-mile spacing on long trips.
+- Geocoding and forecast caching is process-local, in-memory, non-persistent, and not shared across workers.
+- The risk engine is a fixed threshold model; it does not model traffic, road surface, closures, vehicle dimensions, or driver-specific guidance.
+- The map uses CARTO Voyager tiles and OpenStreetMap data/attribution; availability and usage are subject to their terms.
+- No accounts, authentication, persistent trip storage, or application-level rate limiting are implemented.
+- The production JavaScript bundle has previously emitted a size advisory; consider lazy-loading MapLibre and splitting bundles if optimizing for scale.
 
-- Real ORS routes and alternatives require an active key, quota and provider availability. ORS alternative-route calculations are limited to trips under 100 km; for longer trips the backend retries once without the alternatives option and returns only the provider's actual route, with an explanatory notice. It does not fabricate alternatives.
-- HGV profile results are not regulatory clearance; height, axle, weight and road restrictions can be incomplete or missing.
-- Open-Meteo horizon is limited (the service requests seven forecast days). Forecasts beyond available hourly data are reported unavailable; no weather is invented. The 0–48h slider only visualizes forecast observations within its matching window.
-- The planner fetches weather per checkpoint sequentially. A long route at a 10-mile spacing can create many upstream calls and a long request. Provider quotas, rate limiting and deployment request-duration limits apply.
-- In-memory caches are process-local, non-persistent and duplicated across Gunicorn workers. Nominatim's request serialization is also local to one worker.
-- The risk model is a fixed threshold heuristic and does not incorporate official road closures, road surface, vehicle configuration, traffic or driver-specific guidance.
-- The map uses CARTO Voyager vector tiles with OpenStreetMap attribution for clearer roads and place labels. Tile availability, attribution and usage remain subject to CARTO's terms; use a contracted tile service if traffic grows.
-- Current Vite production build emits a large JavaScript chunk advisory. Consider lazy loading MapLibre or manual chunking before scaling.
-- No browser/API authentication, rate limiting, persistent database or user accounts are implemented; protect the API with provider quotas/hosting controls if exposed to untrusted high-volume traffic.
-- Frontend line/branch coverage is not measured yet. Existing frontend tests report test counts, not a code coverage percentage.
+## Demo walkthrough
 
-## Walkthrough script
+See [`LOOM_WALKTHROUGH.md`](LOOM_WALKTHROUGH.md) for the 5–10 minute narrated demo, on-screen actions, suggested risk scenarios, and presenter checklist.
 
-See [LOOM_WALKTHROUGH.md](LOOM_WALKTHROUGH.md) for an 8-minute demo script mapped to the assessment checklist, including the honest fallback if provider credentials or public deployment are not ready.
+## License
+
+No open-source license is currently declared. Use and redistribution are subject to the repository owner's terms unless a license is added.

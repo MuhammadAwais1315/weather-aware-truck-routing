@@ -30,6 +30,12 @@ Automated test counts above are actual executed results. The 137 tests use mocke
 
 The backend suite last completed with 104 passing tests. The earlier Coverage.py run measured 85.0% branch coverage at 101 tests; coverage was not recalculated after the latest three backend regression tests. Frontend tests do not currently have a coverage provider, so a frontend coverage percentage is unavailable. See [TESTING.md](TESTING.md).
 
+## Follow-up verification — 2026-11-05
+
+After the QA run above, the route card status was clarified so routes with nonzero high/severe exposure are labeled **CAUTION** instead of appearing safe solely because they have no No Travel segments. Frontend verification for this follow-up completed with **48 Vitest tests passed**, **5 Playwright tests passed**, and a successful Vite production build. The built production asset served at [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app/) was checked for the updated `CAUTION` and `LOW RISK` labels. This follow-up did not rerun the Django test suite or recalculate backend coverage.
+
+The original `weather-aware-truck-routing.vercel.app` alias remained assigned to an existing deployment and rejected reassignment. The updated frontend is available at the `-psi` URL above; the API remains at [weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/).
+
 ## Scenario results
 
 | Scenario | Expected | Actual | Pass/Fail |

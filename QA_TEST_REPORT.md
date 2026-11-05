@@ -85,6 +85,14 @@ The live smoke selected an exploratory time 12 hours after departure. The return
 
 `npm run test:all`: Vitest **53 passed, 0 failed**; Playwright **5 passed, 0 failed**. `npm run build`: passed with the MapLibre chunk advisory above. `python manage.py check`: passed. Django suite: **121 passed, 0 failed**. Coverage.py: **83.0%** line/branch coverage. Live public plan and forecast passed: 3 distinct routes, 34 ETA-matched forecasts, 34/34 exploratory forecasts, and no browser/HTTP errors. Frontend source coverage: **not measured**.
 
+### Submission documentation recheck — 2026-11-05
+
+The local backend and frontend automated suites were rerun while preparing submission documentation: `manage.py check` passed; backend **121/121** passed; Vitest **53/53** and Playwright **5/5** passed; production build succeeded. Coverage remains **83.0%**. The build reports the already-documented MapLibre bundle advisory.
+
+Public frontend and backend health endpoints returned HTTP 200. A fresh direct production API plan returned **3 distinct routes** with **34/34** checkpoint weather forecasts; a fresh 12-hour exploratory request returned **34/34** forecasts. The browser-based public smoke could not access the deployment from this QA environment (`ERR_NETWORK_ACCESS_DENIED`), so the fresh recheck verifies the live API workflow, not a new public-browser session. Earlier public-browser smoke results remain recorded above as a separate successful run.
+
+`manage.py check --deploy`, run with a long QA-only signing key and production-style `DEBUG=False`, reported two HSTS warnings: subdomain inclusion and preload are not enabled. They remain off until the owner confirms all relevant subdomains are HTTPS-only and preload requirements are intended. The test key was temporary and is not a deployment credential.
+
 ### Remediation and backend verification — 2026-11-05
 
 - Changed Django's default to `DEBUG=False`; the local environment example opts into `DEBUG=True`. Django still requires an explicit signing secret whenever debug is off.

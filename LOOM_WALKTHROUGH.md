@@ -6,13 +6,14 @@
 
 **Current API health:** [weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/)
 
+**Companion checklist:** [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md)
+
 ## Presenter preparation
 
 - Open the live frontend and confirm it loads. Check the API health endpoint in another tab.
-- Have a three-location trip ready. The demo should begin with **truck location → pickup → destination**.
-- If the live provider is available, use a trip under 100 km where possible to improve the chance that ORS returns alternatives. ORS may still return fewer than three; show only the real provider routes.
-- To demonstrate elevated exposure, try **Buffalo, NY → Rochester, NY → Syracuse, NY**, 42,000 lb, 25-mile interval, and a near-term departure. Forecasts change: point out the risk shown by the current response, rather than promising a particular score.
-- An earlier forecast query suggested **Cape May, NJ → Philadelphia, PA → Atlantic City, NJ** near Nov 6, 2026 at 11:00 PM Tashkent time as a possible No Travel demonstration due to heavy rain. Use it only if the live checkpoint forecast actually crosses the configured threshold; otherwise explain the rule and show the test report's mocked boundary tests. Do not present mock data as live weather.
+- Have a three-location trip ready. A previously verified live example is **New York, NY → Hartford, CT → Boston, MA**; use a departure time about one hour ahead of recording.
+- A shorter journey may improve the chance that ORS returns alternatives. ORS may still return fewer than three; show only real provider routes.
+- Forecasts depend on date, time, location, and provider availability. Do not promise a particular risk classification. To explain a high-risk or No Travel case, show it only if the current live response actually crosses the threshold. Otherwise explain the rule and identify any boundary example from the report as a test case, not live weather.
 - Close secret-bearing tabs. Never show `.env`, API keys, or provider account settings. Keep browser DevTools closed unless intentionally showing request/response behavior.
 - If a provider fails, show the visible error and state that the live call failed. Do not substitute test fixtures without labeling them.
 
@@ -88,7 +89,7 @@ Explain an example: “For instance, 42,000 pounds combined with wind in the 35-
 
 ## Optional No Travel rule explanation
 
-If live weather does not produce a No Travel checkpoint during recording, use this short explanation and label any test fixture as mocked: “The risk engine marks wind at or above 55 mph as No Travel for every load; wind from 45 to under 55 mph is No Travel above 30,000 pounds; rain above 1 inch per hour and snow above 3 inches per hour are also No Travel. When all complete-coverage routes are unsafe, the recommendation reads ‘No safe route available.’”
+If live weather does not produce a No Travel checkpoint during recording, explain the rules without presenting invented conditions as observed data: “The risk engine marks wind at or above 55 mph as No Travel for every load; wind from 45 to under 55 mph is No Travel above 30,000 pounds; rain above 1 inch per hour and snow above 3 inches per hour are also No Travel. When all complete-coverage routes are unsafe, the recommendation reads ‘No safe route available.’ The boundary tests verify these cases.”
 
 ## Post-recording checklist
 

@@ -316,7 +316,7 @@ A health response verifies only API liveness, not the full route/weather workflo
 
 ## Demo walkthrough
 
-See [`LOOM_WALKTHROUGH.md`](LOOM_WALKTHROUGH.md) for the 5–10 minute narrated demo, on-screen actions, suggested risk scenarios, and presenter checklist.
+See [`LOOM_WALKTHROUGH.md`](LOOM_WALKTHROUGH.md) for the 5–10 minute narrated demo, on-screen actions, risk explanation, and presenter checklist. [`SUBMISSION_GUIDE.md`](SUBMISSION_GUIDE.md) collects the assessment rubric, submission links, PowerShell setup/test commands, known limitations, and final hand-in checklist. The Loom recording must be made by the presenter; only the script is included here.
 
 ## License
 

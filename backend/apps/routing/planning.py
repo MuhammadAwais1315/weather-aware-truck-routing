@@ -78,7 +78,9 @@ def build_plan(payload):
         known_scores = [point['risk']['score'] for point in checkpoints if point['risk']['score'] is not None]
         average = round(sum(known_scores) / len(known_scores), 1) if known_scores else None
         route.update({
-            'distance_miles': round(miles, 1), 'duration_hours': round(hours, 2),
+            # Keep provider precision for exposure coverage and route ranking;
+            # the UI formats these values for display.
+            'distance_miles': miles, 'duration_hours': hours,
             'legs': legs,
             'checkpoints': checkpoints,
             'metrics': {
@@ -101,6 +103,7 @@ def build_plan(payload):
         'origin': origin, 'pickup': pickup, 'destination': destination, 'departure_time': departure.isoformat(),
         'load_weight_tons': load, 'checkpoint_interval_miles': interval,
         'routes': routes, 'recommendation': recommendation,
+        'recommendation_status': recommendation['recommendation_status'],
         'recommended_route_id': recommendation['recommended_route_id'],
         'ranked_routes': recommendation['ranked_routes'],
         'route_summaries': recommendation['route_summaries'],

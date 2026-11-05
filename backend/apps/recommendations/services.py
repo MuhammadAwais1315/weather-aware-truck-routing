@@ -126,13 +126,15 @@ def summarize_route(route):
     unknown_weather_miles += max(0.0, distance_miles - segment_miles_total)
 
     average_risk = round(weighted_risk_total / scored_miles, 2) if scored_miles > 0 else None
-    weather_coverage_percentage = (
-        round(min(100.0, scored_miles / distance_miles * 100), 1) if distance_miles > 0 else 0.0
-    )
     if unknown_weather_miles <= 1e-6:
+        weather_coverage_percentage = 100.0
         safety_status = 'unsafe' if no_travel_segments else 'safe'
         forecast_status = 'complete'
     else:
+        # Never round an incomplete route up to 100% coverage.
+        weather_coverage_percentage = (
+            min(99.9, round(scored_miles / distance_miles * 100, 1)) if distance_miles > 0 else 0.0
+        )
         safety_status = 'unsafe' if no_travel_segments else 'unknown'
         forecast_status = 'unavailable' if scored_miles <= 0 else 'partial'
     return {
@@ -145,7 +147,7 @@ def summarize_route(route):
         'average_risk': average_risk,
         'weather_coverage_miles': round(scored_miles, 2),
         'weather_coverage_percentage': weather_coverage_percentage,
-        'unknown_weather_miles': round(unknown_weather_miles, 2),
+        'unknown_weather_miles': round(unknown_weather_miles, 6),
         'unknown_weather_segments': unknown_weather_segments,
         'forecast_status': forecast_status,
         'safety_status': safety_status,

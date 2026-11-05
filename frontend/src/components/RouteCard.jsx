@@ -23,7 +23,7 @@ export default function RouteCard({route,summary,departureTime,active,onClick}){
   {route.legs?.length===2&&<div className="route-leg-summary"><span>Truck → pickup <b>{number(route.legs[0].distance_miles)} mi</b></span><span>Pickup → destination <b>{number(route.legs[1].distance_miles)} mi</b></span></div>}
   <div className="route-arrival"><span className="arrival-icon">◷</span><span><small>Estimated arrival</small><b>{arrivalTime(departureTime,hours)}</b></span></div>
   <div className="route-risk-grid"><div><span className="risk-bar severe-bar"/><small>Severe miles</small><b>{number(severe)} mi</b></div><div><span className="risk-bar high-bar"/><small>High miles</small><b>{number(high)} mi</b></div><div><span className="risk-bar average-bar"/><small>Average risk</small><b>{average==null?'Unavailable':`${number(average,0)} / 100`}</b></div></div>
-  {unknown&&<div className="route-coverage">Forecast coverage: <b>{coverage==null?'incomplete':`${number(coverage,0)}%`}</b>{unknownMiles!=null&&<span>{number(unknownMiles)} mi without scored weather</span>}</div>}
+  {unknown&&<div className="route-coverage">Forecast coverage: <b>{coverage==null?'incomplete':`${number(coverage,1)}%`}</b>{unknownMiles!=null&&<span>{unknownMiles>0&&unknownMiles<0.1?'<0.1':number(unknownMiles)} mi without scored weather</span>}</div>}
   <div className={`route-safety ${safe?'safe':unknown?'unknown':'unsafe'}`}><span className="safety-status-icon">{safe?'✓':'!'}</span><span>{safetyDescription}</span><span className="safety-state">{safetyLabel}</span></div>
  </button>
 }

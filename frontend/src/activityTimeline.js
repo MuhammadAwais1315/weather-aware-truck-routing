@@ -26,15 +26,17 @@ export function buildTripActivityTimeline(route, departureTime) {
     const {point, time} = entry
     const isOrigin = index === 0 || Number(point.distance_from_origin_miles ?? point.distance_miles) === 0
     const isDestination = index === lastPointIndex
+    const isPickup = point.checkpoint_type === 'pickup'
     return {
       id: String(point.id || `${route?.id || 'route'}-activity-${entry.index}`),
       time,
       day: dateKey(time),
-      title: isOrigin ? 'Depart' : isDestination ? 'Arrive' : 'Weather checkpoint',
+      title: isOrigin ? 'Depart' : isPickup ? 'Pickup' : isDestination ? 'Arrive' : 'Weather checkpoint',
       distance: Number(point.distance_from_origin_miles ?? point.distance_miles ?? 0),
       risk: point.risk?.level || 'unknown',
       weather: point.weather || null,
-      endpoint: isOrigin || isDestination,
+      endpoint: isOrigin || isPickup || isDestination,
+      pickup: isPickup,
     }
   })
 

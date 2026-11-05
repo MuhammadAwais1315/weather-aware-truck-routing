@@ -92,6 +92,21 @@ class CheckpointGenerationTests(SimpleTestCase):
         self.assertEqual(checkpoints[0]['coordinates'], [0.0, 0.0])
         self.assertEqual(checkpoints[-1]['coordinates'], [1.0, 0.0])
 
+    def test_required_pickup_distance_is_inserted_as_a_checkpoint(self):
+        checkpoints = self.generate(
+            [[0, 0], [1, 0]], 25, distance=100, duration=3600,
+            additional_checkpoint_distances_miles=[40],
+        )
+        pickup = next(point for point in checkpoints if point['distance_from_origin_miles'] == 40)
+        self.assertEqual([point['distance_from_origin_miles'] for point in checkpoints], [0, 25, 40, 50, 75, 100])
+        self.assertAlmostEqual(pickup['longitude'], 0.4, places=6)
+        self.assertEqual(pickup['distance_to_next_checkpoint_miles'], 10)
+        self.assertEqual(datetime.fromisoformat(pickup['estimated_arrival_time']), self.departure.replace(minute=24))
+
+    def test_required_checkpoint_outside_route_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.generate([[0, 0], [1, 0]], 25, distance=100, additional_checkpoint_distances_miles=[101])
+
     def test_every_checkpoint_contains_required_fields(self):
         checkpoints = self.generate([[0, 0], [1, 0]], 50, distance=100)
         required = {

@@ -26,21 +26,22 @@ function AddressInput({label,name,value,onChange,placeholder}){
 }
 
 export default function PlannerForm({onSubmit,loading}){
- const [form,setForm]=useState(()=>{const departure=initialDeparture();return {origin:'',destination:'',departure_date:departure.date,departure_time:departure.time,load_weight_lb:'',checkpoint_interval_miles:25}})
+ const [form,setForm]=useState(()=>{const departure=initialDeparture();return {origin:'',pickup:'',destination:'',departure_date:departure.date,departure_time:departure.time,load_weight_lb:'',checkpoint_interval_miles:25}})
  const update=e=>setForm(previous=>({...previous,[e.target.name]:e.target.value}))
  function submit(event){
   event.preventDefault()
   const localDeparture=new Date(`${form.departure_date}T${form.departure_time}`)
   onSubmit({
-   origin:form.origin.trim(),destination:form.destination.trim(),
+   origin:form.origin.trim(),pickup:form.pickup.trim(),destination:form.destination.trim(),
    departure_time:localDeparture.toISOString(),
    load_weight_tons:Number(form.load_weight_lb)/2000,
    checkpoint_interval_miles:Number(form.checkpoint_interval_miles),
   })
  }
  return <form className="journey-form" onSubmit={submit}>
-  <AddressInput label="Origin" name="origin" value={form.origin} onChange={update} placeholder="City, address or ZIP code"/>
-  <AddressInput label="Destination" name="destination" value={form.destination} onChange={update} placeholder="Where are you headed?"/>
+  <AddressInput label="Truck location" name="origin" value={form.origin} onChange={update} placeholder="Where is the truck now?"/>
+  <AddressInput label="Pickup location" name="pickup" value={form.pickup} onChange={update} placeholder="Where will freight be picked up?"/>
+  <AddressInput label="Final destination" name="destination" value={form.destination} onChange={update} placeholder="Where is the freight going?"/>
   <label className="dashboard-field">Departure date<input required type="date" name="departure_date" value={form.departure_date} onChange={update}/></label>
   <label className="dashboard-field">Departure time<input required type="time" name="departure_time" value={form.departure_time} onChange={update}/></label>
   <label className="dashboard-field"><span className="field-label-title">Load weight <span className="unit-label">(lb)</span></span><input required type="number" min="0" max="200000" step="1" name="load_weight_lb" value={form.load_weight_lb} onChange={update} placeholder="e.g. 42,000"/></label>

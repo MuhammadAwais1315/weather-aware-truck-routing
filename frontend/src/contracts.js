@@ -22,6 +22,7 @@ function requireAwareTimestamp(value, name) {
 export function validatePlanResponse(data) {
   if (!isRecord(data)) throw new TypeError('Backend returned an empty or invalid route analysis response.')
   requirePlace(data.origin, 'origin')
+  requirePlace(data.pickup, 'pickup')
   requirePlace(data.destination, 'destination')
   requireAwareTimestamp(data.departure_time, 'departure time')
   if (!Array.isArray(data.routes)) throw new TypeError('Backend response is missing the routes array.')
@@ -32,6 +33,15 @@ export function validatePlanResponse(data) {
   for (const [index, route] of data.routes.entries()) {
     const prefix = `Route ${index + 1}`
     if (!isRecord(route) || typeof route.id !== 'string') throw new TypeError(`${prefix} is missing its route ID.`)
+    if (!Array.isArray(route.legs) || route.legs.length !== 2) throw new TypeError(`${prefix} must contain truck-to-pickup and pickup-to-destination legs.`)
+    for (const [legIndex, leg] of route.legs.entries()) {
+      if (!isRecord(leg) || typeof leg.distance_miles !== 'number' || !Number.isFinite(leg.distance_miles)
+          || typeof leg.duration_hours !== 'number' || !Number.isFinite(leg.duration_hours)) {
+        throw new TypeError(`${prefix} leg ${legIndex + 1} is missing valid distance or duration.`)
+      }
+      requireAwareTimestamp(leg.departure_time, `${prefix} leg ${legIndex + 1} departure`)
+      requireAwareTimestamp(leg.estimated_arrival_time, `${prefix} leg ${legIndex + 1} ETA`)
+    }
     if (!isRecord(route.geometry) || route.geometry.type !== 'LineString' || !Array.isArray(route.geometry.coordinates) || route.geometry.coordinates.length < 2) {
       throw new TypeError(`${prefix} is missing valid GeoJSON route geometry.`)
     }

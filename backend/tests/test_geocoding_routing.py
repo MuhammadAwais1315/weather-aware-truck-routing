@@ -91,6 +91,7 @@ class NominatimGeocoderTests(SimpleTestCase):
 class OpenRouteServiceClientTests(SimpleTestCase):
     def setUp(self):
         self.origin = {'latitude': 40.7, 'longitude': -74.0}
+        self.pickup = {'latitude': 41.5, 'longitude': -78.0}
         self.destination = {'latitude': 41.9, 'longitude': -87.6}
 
     @staticmethod
@@ -115,6 +116,28 @@ class OpenRouteServiceClientTests(SimpleTestCase):
                 self.assertGreater(routes[0]['summary']['distance_miles'], 0)
                 self.assertGreater(routes[0]['summary']['duration_hours'], 0)
                 self.assertEqual(session.post.call_args.kwargs['json']['alternative_routes']['target_count'], 3)
+
+    def test_via_pickup_routes_include_two_provider_leg_summaries(self):
+        feature = self.feature(0)
+        feature['geometry']['coordinates'][1] = [-78.0, 41.5]
+        feature['properties']['segments'] = [
+            {'distance': 600_000, 'duration': 20_000, 'steps': [{'way_points': [0, 1], 'duration': 20_000}]},
+            {'distance': 900_000, 'duration': 30_000, 'steps': [{'way_points': [1, 2], 'duration': 30_000}]},
+        ]
+        session = Mock()
+        session.post.return_value = mocked_response({'features': [feature]})
+        client = OpenRouteServiceClient(api_key='test-key', session=session)
+
+        routes = client.get_routes(self.origin, self.destination, via_points=[self.pickup])
+
+        request = session.post.call_args.kwargs['json']
+        self.assertEqual(request['coordinates'], [
+            [-74.0, 40.7], [-78.0, 41.5], [-87.6, 41.9],
+        ])
+        self.assertEqual(len(routes[0]['provider_legs']), 2)
+        self.assertAlmostEqual(routes[0]['waypoint_distances_miles'][0], 600_000 / 1609.344)
+        self.assertAlmostEqual(sum(routes[0]['segment_durations_seconds']), 50_000)
+        self.assertEqual(routes[0]['provider_legs'][0]['waypoint_coordinate'], [-78.0, 41.5])
 
     def test_long_trip_alternative_limit_retries_for_one_actual_route(self):
         limit_response = mocked_response({

@@ -26,12 +26,14 @@ class AwareDateTimeField(serializers.DateTimeField):
 
 class PlanRequestSerializer(serializers.Serializer):
     origin = serializers.CharField(max_length=200)
+    pickup = serializers.CharField(max_length=200)
     destination = serializers.CharField(max_length=200)
     departure_time = AwareDateTimeField()
     load_weight_tons = serializers.FloatField(min_value=0, max_value=100, default=20)
     checkpoint_interval_miles = serializers.ChoiceField(choices=[10, 25, 50], default=25)
 
     def validate(self, attrs):
-        if attrs['origin'].strip().casefold() == attrs['destination'].strip().casefold():
-            raise serializers.ValidationError('Origin and destination must differ.')
+        locations = [attrs['origin'].strip().casefold(), attrs['pickup'].strip().casefold(), attrs['destination'].strip().casefold()]
+        if len(set(locations)) != 3:
+            raise serializers.ValidationError('Truck location, pickup, and destination must be different locations.')
         return attrs

@@ -116,7 +116,8 @@ def _duration_at_distance(target_meters, segment_index, segment_fraction, cumula
 
 
 def generate_checkpoints(route_geometry, total_distance_miles, total_travel_duration_seconds,
-                         departure_datetime, checkpoint_interval_miles, segment_durations_seconds=None):
+                         departure_datetime, checkpoint_interval_miles, segment_durations_seconds=None,
+                         additional_checkpoint_distances_miles=None):
     """Create endpoint-inclusive checkpoints spaced by route miles.
 
     `segment_durations_seconds`, when supplied, must contain one duration for each
@@ -170,6 +171,21 @@ def generate_checkpoints(route_geometry, total_distance_miles, total_travel_dura
         targets.append(next_target)
         next_target += interval
     targets.append(total_distance_miles)
+    if additional_checkpoint_distances_miles is not None:
+        for value in additional_checkpoint_distances_miles:
+            try:
+                distance = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError('Additional checkpoint distances must be numeric miles.') from exc
+            if not math.isfinite(distance) or distance < 0 or distance > total_distance_miles:
+                raise ValueError('Additional checkpoint distances must fall within the route distance.')
+            targets.append(distance)
+        targets.sort()
+        deduplicated = []
+        for distance in targets:
+            if not deduplicated or distance - deduplicated[-1] > DISTANCE_EPSILON_MILES:
+                deduplicated.append(distance)
+        targets = deduplicated
 
     checkpoints = []
     for index, route_miles in enumerate(targets):

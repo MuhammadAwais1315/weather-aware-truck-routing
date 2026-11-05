@@ -60,7 +60,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .section-kicker { color: #668075; font-size: 11px; letter-spacing: 1.35px; }
 .panel-heading h2, .results-heading h2 { margin: 5px 0 0; color: #1b3028; font: 700 23px/1.25 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.45px; }
 .step-tag { border-radius: 999px; padding: 8px 12px; background: #edf7f1; color: #39785b; font-size: 10px; letter-spacing: .4px; }
-.journey-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 18px; align-items: end; }
+.journey-form { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px 18px; align-items: end; }
 .dashboard-field { position: relative; display: flex; min-width: 0; flex-direction: column; gap: 8px; color: #40534a; font-size: 12px; font-weight: 650; }
 .field-label-title { display: block; }
 .field-label-title .unit-label { margin-left: 3px; }
@@ -136,6 +136,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .route-primary-stats span, .route-risk-grid small { color: #7c8a82; font-size: 11px; }
 .route-primary-stats strong { color: #243b30; font-size: 19px; letter-spacing: -.3px; }
 .route-primary-stats strong small { color: #718278; font-size: 12px; font-weight: 500; }
+.route-leg-summary { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid #edf1ee; color: #718078; font-size: 10px; }
+.route-leg-summary span { display: flex; justify-content: space-between; gap: 8px; }
+.route-leg-summary b { color: #456251; font-weight: 650; }
 .route-arrival { display: flex; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #edf1ee; }
 .arrival-icon { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 9px; background: #eff5f7; color: #568198; font-size: 18px; }
 .route-arrival small, .route-arrival b { display: block; }
@@ -195,7 +198,8 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
   .analysis-layout { grid-template-columns: minmax(0, 1.8fr) minmax(245px, .9fr); gap: 12px; }
   .map-wrap { height: 440px; }
   .planner-panel { padding: 22px; }
-  .journey-form { gap: 14px; }
+  .journey-form { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .journey-form > .address-field { grid-column: span 1; }
 }
 
 @media (max-width: 780px) {
@@ -208,6 +212,8 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
   .dashboard-checkpoints { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 360px; }
   .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .map-wrap { height: 430px; }
+  .journey-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journey-form > .address-field { grid-column: span 2; }
 }
 
 @media (max-width: 560px) {
@@ -287,10 +293,13 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-marker { position: absolute; top: 50%; z-index: 2; width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; background: #929e97; box-shadow: 0 0 0 1px #65786e; transform: translate(-50%,-50%); }
 .activity-marker.endpoint { width: 16px; height: 16px; background: #218c63; box-shadow: 0 0 0 2px #d8efe3; }
 .activity-marker.endpoint.destination { background: #df5946; box-shadow: 0 0 0 2px #fae0dc; }
+.activity-marker.endpoint.pickup { background: #3978c5; box-shadow: 0 0 0 2px #dceafd; }
 .activity-event-list { display: grid; gap: 0; max-height: 274px; margin: 12px 0 0; padding: 0; overflow: auto; list-style: none; }
 .activity-event { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 11px; padding: 12px 3px; border-top: 1px solid #edf1ee; }
 .activity-event-dot { width: 10px; height: 10px; margin: 4px 0 0 2px; border-radius: 50%; background: #95a49b; }
 .activity-event-dot.endpoint { background: #238e64; box-shadow: 0 0 0 3px #e6f4ec; }
+.activity-event-dot.endpoint.pickup { background: #3978c5; box-shadow: 0 0 0 3px #e2edfc; }
+.activity-event-dot.endpoint.destination { background: #df5946; box-shadow: 0 0 0 3px #fae0dc; }
 .activity-event-title { display: flex; align-items: baseline; gap: 10px; color: #31483c; font-size: 12px; }
 .activity-event-title span { color: #76867d; font-size: 11px; }
 .activity-event-main p { margin: 4px 0 0; color: #7c8a82; font-size: 10px; line-height: 1.5; }

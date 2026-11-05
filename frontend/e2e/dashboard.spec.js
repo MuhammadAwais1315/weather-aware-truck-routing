@@ -22,9 +22,10 @@ async function stubProviders(page, plans, {planDelay = 0} = {}) {
   return requests
 }
 
-async function fillJourney(page, {origin = 'New York, NY', destination = 'Boston, MA'} = {}) {
-  await page.getByRole('textbox', {name: 'Origin'}).fill(origin)
-  await page.getByRole('textbox', {name: 'Destination'}).fill(destination)
+async function fillJourney(page, {origin = 'New York, NY', pickup = 'Hartford, CT', destination = 'Boston, MA'} = {}) {
+  await page.getByRole('textbox', {name: 'Truck location'}).fill(origin)
+  await page.getByRole('textbox', {name: 'Pickup location'}).fill(pickup)
+  await page.getByRole('textbox', {name: 'Final destination'}).fill(destination)
   await page.getByLabel('Departure date').fill('2026-11-03')
   await page.getByLabel('Departure time').fill('09:30')
   await page.getByLabel(/Load weight/).fill('42000')
@@ -35,11 +36,12 @@ test('autocomplete, journey API integration, route recommendation, map, and fore
   const plans = [makePlan()]
   const requests = await stubProviders(page, plans, {planDelay: 350})
   await page.goto('/')
-  await page.getByRole('textbox', {name: 'Origin'}).fill('New York')
+  await page.getByRole('textbox', {name: 'Truck location'}).fill('New York')
   const option = page.getByRole('option', {name: 'New York, NY, USA'})
   await expect(option).toBeVisible({timeout: 5000})
   await option.click()
-  await page.getByLabel('Destination').fill('Boston, MA')
+  await page.getByLabel('Pickup location').fill('Hartford, CT')
+  await page.getByLabel('Final destination').fill('Boston, MA')
   await page.getByLabel('Departure date').fill('2026-11-03')
   await page.getByLabel('Departure time').fill('09:30')
   await page.getByLabel(/Load weight/).fill('42000')
@@ -59,7 +61,7 @@ test('autocomplete, journey API integration, route recommendation, map, and fore
   await page.getByRole('slider', {name: 'Forecast hour'}).fill('12')
   await expect(page.getByText('+12')).toBeVisible()
   expect(requests).toHaveLength(1)
-  expect(requests[0]).toMatchObject({origin: 'New York, NY, USA', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
+  expect(requests[0]).toMatchObject({origin: 'New York, NY, USA', pickup: 'Hartford, CT', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
   expect(requests[0].departure_time).toMatch(/Z$/)
 })
 
@@ -80,14 +82,14 @@ test('error and loading messages are usable when the plan endpoint fails', async
 test('a second journey submission removes old route cards and old map instance', async ({page}) => {
   const first = makePlan()
   const replacementRoute = makeRoute('route-9', 'Replacement provider route', {recommended: true, distance: 333})
-  const second = makePlan({origin: 'Albany, NY', destination: 'Philadelphia, PA', routes: [replacementRoute], recommendedId: 'route-9'})
+  const second = makePlan({origin: 'Albany, NY', pickup: 'New York, NY', destination: 'Philadelphia, PA', routes: [replacementRoute], recommendedId: 'route-9'})
   const requests = await stubProviders(page, [first, second])
   await page.goto('/')
   await fillJourney(page)
   await page.getByRole('button', {name: 'Analyze routes'}).click()
   await expect(page.getByRole('heading', {name: 'Compare 2 routes'})).toBeVisible()
   await expect(page.locator('.map-wrap .map-canvas')).toHaveCount(1)
-  await fillJourney(page, {origin: 'Albany, NY', destination: 'Philadelphia, PA'})
+  await fillJourney(page, {origin: 'Albany, NY', pickup: 'New York, NY', destination: 'Philadelphia, PA'})
   await page.getByRole('button', {name: 'Analyze routes'}).click()
   await expect(page.getByRole('heading', {name: 'Compare 1 route'})).toBeVisible()
   await expect(page.getByText('Replacement provider route')).toBeVisible()
@@ -95,7 +97,7 @@ test('a second journey submission removes old route cards and old map instance',
   await expect(page.locator('.map-wrap .map-canvas')).toHaveCount(1)
   await expect(page.locator('.maplibregl-canvas')).toHaveCount(1)
   expect(requests).toHaveLength(2)
-  expect(requests[1]).toMatchObject({origin: 'Albany, NY', destination: 'Philadelphia, PA'})
+  expect(requests[1]).toMatchObject({origin: 'Albany, NY', pickup: 'New York, NY', destination: 'Philadelphia, PA'})
 })
 
 test('dashboard fits mobile, tablet, and desktop widths without horizontal overflow', async ({page}) => {

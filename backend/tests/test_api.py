@@ -11,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 
 VALID_REQUEST = {
     'origin': 'New York, NY',
+    'pickup': 'Cleveland, OH',
     'destination': 'Chicago, IL',
     'departure_time': '2026-11-03T14:00:00Z',
     'load_weight_tons': 20,
@@ -37,7 +38,7 @@ class PlanRequestSerializerTests(SimpleTestCase):
     def test_missing_fields_are_rejected(self):
         serializer = PlanRequestSerializer(data={})
         self.assertFalse(serializer.is_valid())
-        self.assertTrue({'origin', 'destination', 'departure_time'}.issubset(serializer.errors))
+        self.assertTrue({'origin', 'pickup', 'destination', 'departure_time'}.issubset(serializer.errors))
 
     def test_invalid_interval_and_load_boundaries_are_rejected(self):
         for interval in (0, 15, 100):
@@ -55,6 +56,13 @@ class PlanRequestSerializerTests(SimpleTestCase):
         serializer = PlanRequestSerializer(data={**VALID_REQUEST, 'destination': ' new york, ny '})
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
+
+    def test_pickup_cannot_duplicate_truck_location_or_destination(self):
+        for field, value in [('pickup', ' new york, ny '), ('pickup', ' Chicago, IL '), ('destination', 'Cleveland, OH')]:
+            with self.subTest(field=field, value=value):
+                serializer = PlanRequestSerializer(data={**VALID_REQUEST, field: value})
+                self.assertFalse(serializer.is_valid())
+                self.assertIn('non_field_errors', serializer.errors)
 
     def test_invalid_departure_format_is_rejected(self):
         serializer = PlanRequestSerializer(data={**VALID_REQUEST, 'departure_time': 'next Tuesday morning'})
@@ -104,6 +112,7 @@ class ApiEndpointTests(SimpleTestCase):
     def test_plan_endpoint_passes_validated_request_and_returns_actual_plan(self, build_plan):
         expected = {
             'origin': {'label': 'New York', 'latitude': 40.7, 'longitude': -74.0},
+            'pickup': {'label': 'Cleveland', 'latitude': 41.5, 'longitude': -81.7},
             'destination': {'label': 'Chicago', 'latitude': 41.9, 'longitude': -87.6},
             'departure_time': '2026-11-03T14:00:00+00:00',
             'routes': [], 'recommended_route_id': None, 'route_summaries': [],

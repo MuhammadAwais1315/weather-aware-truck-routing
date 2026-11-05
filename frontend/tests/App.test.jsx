@@ -7,9 +7,10 @@ import {makePlan, makeRoute} from './fixtures.js'
 vi.mock('../src/api.js', () => ({planRoute: vi.fn(), autocompletePlaces: vi.fn()}))
 vi.mock('../src/components/MapView.jsx', () => import('./mocks/MapView.jsx'))
 
-function fillRequiredFields(origin = 'New York, NY', destination = 'Boston, MA') {
-  fireEvent.change(screen.getByLabelText('Origin'), {target: {value: origin}})
-  fireEvent.change(screen.getByLabelText('Destination'), {target: {value: destination}})
+function fillRequiredFields(origin = 'New York, NY', pickup = 'Hartford, CT', destination = 'Boston, MA') {
+  fireEvent.change(screen.getByLabelText('Truck location'), {target: {value: origin}})
+  fireEvent.change(screen.getByLabelText('Pickup location'), {target: {value: pickup}})
+  fireEvent.change(screen.getByLabelText('Final destination'), {target: {value: destination}})
   fireEvent.change(screen.getByLabelText(/Load weight/), {target: {value: '42000'}})
 }
 
@@ -40,7 +41,7 @@ describe('journey dashboard integration', () => {
     expect(screen.getByTestId('map-view')).toBeInTheDocument()
     expect(screen.getByRole('slider', {name: 'Forecast hour'})).toBeInTheDocument()
     const payload = planRoute.mock.calls[0][0]
-    expect(payload).toMatchObject({origin: 'New York, NY', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
+    expect(payload).toMatchObject({origin: 'New York, NY', pickup: 'Hartford, CT', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
     expect(payload.departure_time).toMatch(/Z$/)
   })
 
@@ -69,7 +70,7 @@ describe('journey dashboard integration', () => {
   it('repeated journey submissions remove old route cards and map route data', async () => {
     const firstPlan = makePlan()
     const nextRoute = makeRoute('route-8', 'New provider alternative', {recommended: true, distance: 350})
-    const secondPlan = makePlan({origin: 'Albany, NY', destination: 'Philadelphia, PA', routes: [nextRoute], recommendedId: 'route-8'})
+    const secondPlan = makePlan({origin: 'Albany, NY', pickup: 'New York, NY', destination: 'Philadelphia, PA', routes: [nextRoute], recommendedId: 'route-8'})
     planRoute.mockResolvedValueOnce(firstPlan).mockResolvedValueOnce(secondPlan)
     render(<App/>)
     fillRequiredFields()
@@ -77,7 +78,7 @@ describe('journey dashboard integration', () => {
     expect(await screen.findByRole('heading', {name: 'Compare 2 routes'})).toBeInTheDocument()
     expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
 
-    fillRequiredFields('Albany, NY', 'Philadelphia, PA')
+    fillRequiredFields('Albany, NY', 'New York, NY', 'Philadelphia, PA')
     submitForm()
     expect(await screen.findByRole('heading', {name: 'Compare 1 route'})).toBeInTheDocument()
     expect(screen.queryByText('Northern corridor')).not.toBeInTheDocument()

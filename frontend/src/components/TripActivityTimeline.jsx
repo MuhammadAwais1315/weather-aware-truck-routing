@@ -50,7 +50,7 @@ export default function TripActivityTimeline({route, departureTime}) {
             {daySegments.map(segment => <div key={segment.id} className="activity-drive-segment" style={{left: `${segment.left}%`, width: `${Math.max(segment.width, 0.3)}%`}} title={`Estimated driving ${formatTimelineTime(segment.start)}–${formatTimelineTime(segment.end)}`} />)}
             {dayEvents.map(event => {
               const position = getTimelineEventPosition(event.time)
-              return <span key={event.id} className={`activity-marker ${event.endpoint ? `endpoint${event.title === 'Arrive' ? ' destination' : ''}` : ''} risk-${event.risk}`} style={{left: `${position}%`}} title={`${event.title} · ${formatTimelineTime(event.time)} · ${riskName(event.risk)}`}/>
+              return <span key={event.id} className={`activity-marker ${event.endpoint ? `endpoint${event.title === 'Arrive' ? ' destination' : event.pickup ? ' pickup' : ''}` : ''} risk-${event.risk}`} style={{left: `${position}%`}} title={`${event.title} · ${formatTimelineTime(event.time)} · ${riskName(event.risk)}`}/>
             })}
           </div>
         </div>
@@ -58,7 +58,7 @@ export default function TripActivityTimeline({route, departureTime}) {
 
       <ol className="activity-event-list" aria-label="Route activity events">
         {dayEvents.map(event => <li key={event.id} className="activity-event">
-          <span className={`activity-event-dot risk-${event.risk}${event.endpoint ? ' endpoint' : ''}`} aria-hidden="true"/>
+          <span className={`activity-event-dot risk-${event.risk}${event.endpoint ? ' endpoint' : ''}${event.pickup ? ' pickup' : ''}${event.title === 'Arrive' ? ' destination' : ''}`} aria-hidden="true"/>
           <div className="activity-event-main">
             <div className="activity-event-title"><b>{event.title}</b><span>{formatTimelineTime(event.time)}</span></div>
             <p>{event.distance.toFixed(1)} miles from origin · {weatherSummary(event.weather)}</p>

@@ -62,17 +62,18 @@ class OpenRouteServiceClient:
                     suggestions.append({'label': label, 'longitude': longitude, 'latitude': latitude})
         return suggestions
 
-    def get_routes(self, origin, destination, profile=None):
+    def get_routes(self, origin, destination, profile=None, via_points=None):
         self._ensure_api_key()
         self._validate_place(origin, 'origin')
         self._validate_place(destination, 'destination')
+        via_points = list(via_points or [])
+        for index, place in enumerate(via_points, start=1):
+            self._validate_place(place, f'waypoint {index}')
         profile = profile or os.getenv('OPENROUTESERVICE_PROFILE', 'driving-hgv').strip()
         url = f'{self.base_url}/v2/directions/{profile}/geojson'
+        places = [origin, *via_points, destination]
         body = {
-            'coordinates': [
-                [float(origin['longitude']), float(origin['latitude'])],
-                [float(destination['longitude']), float(destination['latitude'])],
-            ],
+            'coordinates': [[float(place['longitude']), float(place['latitude'])] for place in places],
             'alternative_routes': {'target_count': 3, 'weight_factor': 1.6, 'share_factor': 0.6},
             'instructions': True,
         }
@@ -137,6 +138,45 @@ class OpenRouteServiceClient:
                         'profile': profile,
                     },
                 }
+                if via_points:
+                    provider_segments = properties.get('segments')
+                    if not isinstance(provider_segments, list) or len(provider_segments) != len(places) - 1:
+                        raise ServiceError(
+                            'OpenRouteService did not return segment summaries for every required trip leg.',
+                            status_code=502, code='routing_missing_leg_summaries',
+                        )
+                    provider_legs = []
+                    for segment_index, segment in enumerate(provider_segments):
+                        leg_distance = float(segment['distance'])
+                        leg_duration = float(segment['duration'])
+                        if (not math.isfinite(leg_distance) or leg_distance <= 0
+                                or not math.isfinite(leg_duration) or leg_duration < 0):
+                            raise ServiceError('OpenRouteService returned an invalid trip-leg summary.', status_code=502)
+                        provider_leg = {
+                            'distance_meters': leg_distance,
+                            'distance_miles': leg_distance / 1609.344,
+                            'duration_seconds': leg_duration,
+                        }
+                        if segment_index < len(provider_segments) - 1:
+                            steps = segment.get('steps') or []
+                            waypoint_index = None
+                            if steps and isinstance(steps[-1].get('way_points'), (list, tuple)):
+                                waypoint_index = int(steps[-1]['way_points'][-1])
+                            if waypoint_index is None or not 0 <= waypoint_index < len(geometry['coordinates']):
+                                waypoint_index = min(
+                                    range(len(geometry['coordinates'])),
+                                    key=lambda index: haversine(
+                                        geometry['coordinates'][index],
+                                        [via_points[segment_index]['longitude'], via_points[segment_index]['latitude']],
+                                    ),
+                                )
+                            provider_leg['waypoint_coordinate'] = geometry['coordinates'][waypoint_index]
+                        provider_legs.append(provider_leg)
+                    route['provider_legs'] = provider_legs
+                    route['waypoint_distances_miles'] = [
+                        sum(leg['distance_miles'] for leg in provider_legs[:index])
+                        for index in range(1, len(provider_legs))
+                    ]
                 if alternatives_limited_note:
                     route['alternatives_note'] = alternatives_limited_note
                 segment_durations = self._segment_durations(properties, geometry['coordinates'])

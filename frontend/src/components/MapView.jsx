@@ -36,7 +36,7 @@ function addDetailRow(container, label, value) {
   container.append(row)
 }
 
-export default function MapView({ routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, destination }) {
+export default function MapView({ routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, pickup, destination }) {
   const host = useRef(null)
   const map = useRef(null)
   const popup = useRef(null)
@@ -44,11 +44,11 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
   const fittedRoutes = useRef(null)
   const [layers, setLayers] = useState({ alternatives: true, checkpoints: true, heatmap: false, endpoints: true })
   const routeSignature = useMemo(() => JSON.stringify([
-    origin?.longitude, origin?.latitude, destination?.longitude, destination?.latitude,
+    origin?.longitude, origin?.latitude, pickup?.longitude, pickup?.latitude, destination?.longitude, destination?.latitude,
     routes.map(route => [route.id, route.geometry?.coordinates?.[0], route.geometry?.coordinates?.at(-1), route.geometry?.coordinates?.length || 0]),
   ]), [routes, origin, destination])
 
-  const data = useMemo(() => ({ routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, destination, layers, routeSignature }), [routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, destination, layers, routeSignature])
+  const data = useMemo(() => ({ routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, pickup, destination, layers, routeSignature }), [routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, pickup, destination, layers, routeSignature])
   latest.current = data
 
   const onCheckpointClick = useCallback(event => {
@@ -138,7 +138,7 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
     <div className="map-canvas" ref={host}>
       <div className="map-layer-control" role="group" aria-label="Map layers">
         <strong>Map layers</strong>
-        {[["alternatives", 'Alternative routes'], ["checkpoints", 'Weather checkpoints'], ["heatmap", 'Weather heatmap'], ["endpoints", 'Origin & destination']].map(([key, label]) => (
+        {[["alternatives", 'Alternative routes'], ["checkpoints", 'Weather checkpoints'], ["heatmap", 'Weather heatmap'], ["endpoints", 'Truck, pickup & destination']].map(([key, label]) => (
           <label key={key}><input type="checkbox" checked={layers[key]} onChange={event => setLayers(current => ({ ...current, [key]: event.target.checked }))} />{label}</label>
         ))}
       </div>
@@ -148,7 +148,7 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
 
 function updateMap(map, data, shouldFit) {
   if (!map || !data || !SOURCE_IDS.every(id => map.getSource(id))) return
-  const { routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, destination, layers } = data
+  const { routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, pickup, destination, layers } = data
   const routeFeatures = routes.filter(route => route.geometry?.type === 'LineString' && route.geometry.coordinates?.length >= 2).map((route, index) => {
     const recommended = route.id === recommendedRouteId || route.recommended === true
     return { type: 'Feature', geometry: route.geometry, properties: { id: route.id, name: route.name || `Route ${index + 1}`, color: recommended ? ROUTE_COLORS[0] : ROUTE_COLORS[(index % (ROUTE_COLORS.length - 1)) + 1], selected: route.id === selectedRouteId, recommended, visible: recommended || route.id === selectedRouteId || layers.alternatives } }
@@ -159,7 +159,7 @@ function updateMap(map, data, shouldFit) {
   })
   const checkpointFeatures = checkpointData.features
   const endpoints = []
-  for (const [key, place, label, color] of [['origin', origin, 'Origin', '#23966c'], ['destination', destination, 'Destination', '#dc513d']]) {
+  for (const [key, place, label, color] of [['origin', origin, 'Truck', '#23966c'], ['pickup', pickup, 'Pickup', '#3978c5'], ['destination', destination, 'Destination', '#dc513d']]) {
     const coordinate = safeCoordinate(place)
     if (coordinate) endpoints.push({ type: 'Feature', geometry: { type: 'Point', coordinates: coordinate }, properties: { id: key, label: place.label ? `${label}: ${place.label.split(',')[0]}` : label, color } })
   }

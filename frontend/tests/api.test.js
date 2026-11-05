@@ -11,7 +11,7 @@ describe('Django route analysis API client', () => {
 
   it('posts the exact plan payload to the Django route endpoint and validates its response', async () => {
     const payload = {
-      origin: 'New York, NY', destination: 'Boston, MA', departure_time: '2026-11-03T14:00:00.000Z',
+      origin: 'New York, NY', pickup: 'Hartford, CT', destination: 'Boston, MA', departure_time: '2026-11-03T14:00:00.000Z',
       load_weight_tons: 21, checkpoint_interval_miles: 25,
     }
     const response = makePlan()

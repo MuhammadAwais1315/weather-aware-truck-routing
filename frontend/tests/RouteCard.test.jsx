@@ -14,7 +14,8 @@ describe('route comparison card', () => {
     expect(screen.getByText('12.5 mi')).toBeInTheDocument()
     expect(screen.getByText('20 mi')).toBeInTheDocument()
     expect(screen.getByText('42 / 100')).toBeInTheDocument()
-    expect(screen.getByText('SAFE')).toBeInTheDocument()
+    expect(screen.getByText('CAUTION')).toBeInTheDocument()
+    expect(screen.getByText(/12.5 mi severe · 20 mi high risk · no No Travel segments/)).toBeInTheDocument()
     const eta = new Date(new Date('2026-11-03T14:00:00Z').getTime() + 5.5 * 3600000)
     expect(screen.getByText(eta.toLocaleString(undefined, {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}))).toBeInTheDocument()
   })
@@ -24,7 +25,7 @@ describe('route comparison card', () => {
     const {container} = render(<RouteCard route={route} summary={{no_travel_segment_count: 2}} departureTime="2026-11-03T14:00:00Z" active onClick={vi.fn()}/> )
     expect(container.querySelector('.comparison-card')).toHaveClass('selected', 'recommended')
     expect(screen.getByText('BEST OPTION')).toBeInTheDocument()
-    expect(screen.getByText('UNSAFE')).toBeInTheDocument()
+    expect(screen.getByText('NO TRAVEL')).toBeInTheDocument()
     expect(screen.getByText('2 No Travel segments')).toBeInTheDocument()
   })
 
@@ -34,5 +35,12 @@ describe('route comparison card', () => {
     render(<RouteCard route={route} summary={{}} departureTime="2026-11-03T14:00:00Z" active={false} onClick={onClick}/> )
     fireEvent.click(screen.getByRole('button'))
     expect(onClick).toHaveBeenCalledOnce()
+  })
+
+  it('uses low-risk wording only when the assessed route has no risk exposure', () => {
+    const route = makeRoute('low-route', 'Low exposure route')
+    render(<RouteCard route={route} summary={{average_risk: 0, severe_miles: 0, high_miles: 0, no_travel_segment_count: 0}} departureTime="2026-11-03T14:00:00Z" active={false} onClick={vi.fn()}/> )
+    expect(screen.getByText('LOW RISK')).toBeInTheDocument()
+    expect(screen.getByText(/no elevated risk · no No Travel segments/)).toBeInTheDocument()
   })
 })

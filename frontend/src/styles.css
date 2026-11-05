@@ -151,6 +151,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .route-risk-grid b { color: #354b3f; font-size: 12px; }
 .route-safety { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 10px; border-radius: 8px; font-size: 11px; }
 .route-safety.safe { background: #edf8f0; color: #32734c; }
+.route-safety.caution { background: #fff7e7; color: #8d5b06; }
 .route-safety.unsafe { background: #fff1ef; color: #a14137; }
 .route-safety.unknown { background: #fff8e8; color: #8a6416; }
 .route-coverage { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 8px 2px 0; color: #8a6416; font-size: 11px; }

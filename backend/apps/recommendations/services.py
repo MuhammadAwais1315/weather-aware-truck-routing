@@ -178,7 +178,7 @@ def recommend_route(routes):
     if selected:
         explanation = (
             f"Recommended {selected['route_name']} (route {recommended_route_id}): it ranks best among "
-            f"{len(safe_summaries)} safe route(s) by {', '.join(RANKING_PRIORITIES)}. "
+            f"{len(safe_summaries)} route(s) without No Travel segments by {', '.join(RANKING_PRIORITIES)}. "
             'Routes containing No Travel segments are excluded from recommendation.'
         )
     elif route_summaries and all(summary['no_travel_segment_count'] > 0 for summary in route_summaries):

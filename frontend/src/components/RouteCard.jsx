@@ -13,11 +13,18 @@ export default function RouteCard({route,summary,departureTime,active,onClick}){
  const safetyStatus=summary?.safety_status||(noTravel>0?'unsafe':average==null?'unknown':'safe')
  const safe=safetyStatus==='safe'
  const unknown=safetyStatus==='unknown'
+ const severeValue=Number(severe)||0
+ const highValue=Number(high)||0
+ const averageValue=Number(average)||0
+ const caution=safe&&(severeValue>0||highValue>0||averageValue>0)
  const unknownMiles=summary?.unknown_weather_miles
  const coverage=summary?.weather_coverage_percentage
- const safetyLabel=safe?'SAFE':unknown?'UNKNOWN':'UNSAFE'
- const safetyDescription=safe?'Complete forecast · no No Travel segments':unknown?'Incomplete forecast coverage':`${noTravel} No Travel segment${noTravel===1?'':'s'}`
- const routeSubtitle=safe?'Forecast assessed':unknown?'Forecast incomplete':'Weather restriction risk'
+ const safetyLabel=caution?'CAUTION':safe?'LOW RISK':unknown?'UNKNOWN':'NO TRAVEL'
+ const exposure=[]
+ if(severeValue>0)exposure.push(`${number(severeValue)} mi severe`)
+ if(highValue>0)exposure.push(`${number(highValue)} mi high risk`)
+ const safetyDescription=safe?`Forecast complete · ${exposure.length?exposure.join(' · '):'no elevated risk'} · no No Travel segments`:unknown?'Incomplete forecast coverage':`${noTravel} No Travel segment${noTravel===1?'':'s'}`
+ const routeSubtitle=caution?'Weather risk along route':safe?'Forecast assessed':unknown?'Forecast incomplete':'Weather restriction risk'
  return <button type="button" className={`comparison-card ${active?'selected':''} ${route.recommended?'recommended':''}`} onClick={onClick}>
   <div className="comparison-card-heading"><span className="route-index">{String(route.id||'').match(/\d+/)?.[0]||'•'}</span><div className="route-title-group"><span className="route-name">{route.name||'Route option'}</span><span className="route-subtitle">{routeSubtitle}</span></div>{route.recommended&&<span className="recommend-badge">BEST OPTION</span>}</div>
   <div className="route-primary-stats"><div><span>Distance</span><strong>{number(distance)}<small> mi</small></strong></div><div><span>Duration</span><strong>{duration(hours)}</strong></div></div>
@@ -25,6 +32,6 @@ export default function RouteCard({route,summary,departureTime,active,onClick}){
   <div className="route-arrival"><span className="arrival-icon">◷</span><span><small>Estimated arrival</small><b>{arrivalTime(departureTime,hours)}</b></span></div>
   <div className="route-risk-grid"><div><span className="risk-bar severe-bar"/><small>Severe miles</small><b>{number(severe)} mi</b></div><div><span className="risk-bar high-bar"/><small>High miles</small><b>{number(high)} mi</b></div><div><span className="risk-bar average-bar"/><small>Average risk</small><b>{average==null?'Unavailable':`${number(average,0)} / 100`}</b></div></div>
   {unknown&&<div className="route-coverage">Forecast coverage: <b>{coverage==null?'incomplete':`${number(coverage,1)}%`}</b>{unknownMiles!=null&&<span>{unknownMiles>0&&unknownMiles<0.1?'<0.1':number(unknownMiles)} mi without scored weather</span>}</div>}
-  <div className={`route-safety ${safe?'safe':unknown?'unknown':'unsafe'}`}><span className="safety-status-icon">{safe?'✓':'!'}</span><span>{safetyDescription}</span><span className="safety-state">{safetyLabel}</span></div>
+  <div className={`route-safety ${caution?'caution':safe?'safe':unknown?'unknown':'unsafe'}`}><span className="safety-status-icon">{safe?'✓':'!'}</span><span>{safetyDescription}</span><span className="safety-state">{safetyLabel}</span></div>
  </button>
 }

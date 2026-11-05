@@ -89,9 +89,11 @@ The live smoke selected an exploratory time 12 hours after departure. The return
 
 - Changed Django's default to `DEBUG=False`; the local environment example opts into `DEBUG=True`. Django still requires an explicit signing secret whenever debug is off.
 - Added configurable Django Redis cache support via `REDIS_URL` and added the Redis client dependency. This shares throttle counters when configured; the current deployment still needs an actual Redis URL to enforce aggregate limits.
-- Reworked the live smoke script for the current truck/pickup/destination fields, a near-future departure time, and selected-hour forecast request. Node syntax validation passed. It has not yet been exercised against live APIs.
+- Reworked the live smoke script for the current truck/pickup/destination fields, a near-future departure time, and selected-hour forecast request. Node syntax validation and the public live smoke both passed.
 - The first current backend run found three stale tests: expected route-provider request count ignored preference retries, expected the old 40-location batch size, and the throttle test changed DRF settings without updating the cached class attribute. The tests now model the implementation correctly. Full `manage.py check` and all **121 backend tests pass**.
 - Current coverage is **83.0%** across 1,266 statements and 424 branches. The frontend suites also pass (**53 Vitest + 5 Playwright**).
+
+### Historical baseline scenarios (superseded where newer results appear above)
 
 | Scenario | Expected | Actual | Pass/Fail |
 |---|---|---|---|

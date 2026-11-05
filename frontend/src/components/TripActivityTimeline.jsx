@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react'
-import {buildTripActivityTimeline, formatTimelineTime, getTimelineEventPosition} from '../activityTimeline.js'
+import {buildTripActivityTimeline, formatTimelineTime, getTimelineEventPosition, getTimelineScale} from '../activityTimeline.js'
 
 const weatherSummary = weather => {
   if (!weather || weather.available === false) return 'Forecast unavailable'
@@ -17,6 +17,7 @@ export default function TripActivityTimeline({route, departureTime}) {
   const dayKey = model.days.some(day => day.key === selectedDay) ? selectedDay : model.days[0]?.key
   const dayEvents = model.events.filter(event => event.day === dayKey)
   const daySegments = model.segments.filter(segment => segment.day === dayKey)
+  const scale = getTimelineScale(dayEvents, daySegments)
 
   if (!model.events.length) {
     return <section className="trip-activity-view" aria-label="Trip activity timeline"><p className="activity-empty">Checkpoint arrival times are not available for this route.</p></section>
@@ -41,15 +42,19 @@ export default function TripActivityTimeline({route, departureTime}) {
       <div className="activity-chart" aria-label={`Route activities for ${model.days.find(day => day.key === dayKey)?.label}`}>
         <div className="activity-axis-label">LOCAL TIME</div>
         <div className="activity-hour-axis" aria-hidden="true">
-          {[0, 6, 12, 18, 24].map(hour => <span key={hour} style={{left: `${hour / 24 * 100}%`}}>{hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour === 24 ? '12 AM' : `${hour % 12} ${hour < 12 ? 'AM' : 'PM'}`}</span>)}
+          {scale.ticks.map((tick, index) => <span key={tick} className={index === 0 ? 'first' : index === scale.ticks.length - 1 ? 'last' : ''} style={{left: `${getTimelineEventPosition(tick, scale)}%`}}>{formatTimelineTime(tick)}</span>)}
         </div>
         <div className="activity-track-row">
           <div className="activity-track-label"><b>Driving</b><small>Estimated</small></div>
           <div className="activity-track" role="img" aria-label={`${daySegments.length} estimated driving segments`}>
-            {[0, 6, 12, 18, 24].map(hour => <i key={hour} className="activity-grid-line" style={{left: `${hour / 24 * 100}%`}}/>)}
-            {daySegments.map(segment => <div key={segment.id} className="activity-drive-segment" style={{left: `${segment.left}%`, width: `${Math.max(segment.width, 0.3)}%`}} title={`Estimated driving ${formatTimelineTime(segment.start)}–${formatTimelineTime(segment.end)}`} />)}
+            {scale.ticks.map(tick => <i key={tick} className="activity-grid-line" style={{left: `${getTimelineEventPosition(tick, scale)}%`}}/>)}
+            {daySegments.map(segment => {
+              const left = getTimelineEventPosition(segment.start, scale)
+              const right = getTimelineEventPosition(segment.end, scale)
+              return <div key={segment.id} className="activity-drive-segment" style={{left: `${left}%`, width: `${Math.max(right - left, 0.3)}%`}} title={`Estimated driving ${formatTimelineTime(segment.start)}–${formatTimelineTime(segment.end)}`} />
+            })}
             {dayEvents.map(event => {
-              const position = getTimelineEventPosition(event.time)
+              const position = getTimelineEventPosition(event.time, scale)
               return <span key={event.id} className={`activity-marker ${event.endpoint ? `endpoint${event.title === 'Arrive' ? ' destination' : event.pickup ? ' pickup' : ''}` : ''} risk-${event.risk}`} style={{left: `${position}%`}} title={`${event.title} · ${formatTimelineTime(event.time)} · ${riskName(event.risk)}`}/>
             })}
           </div>

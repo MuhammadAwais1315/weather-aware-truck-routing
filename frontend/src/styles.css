@@ -307,8 +307,8 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-axis-label { position: absolute; top: 0; left: 0; color: #8a9991; font-size: 9px; font-weight: 700; letter-spacing: .8px; }
 .activity-hour-axis { position: relative; height: 23px; margin-left: 100px; border-bottom: 1px solid #e5ebe7; }
 .activity-hour-axis span { position: absolute; bottom: 5px; color: #839188; font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
-.activity-hour-axis span:first-child { transform: none; }
-.activity-hour-axis span:last-child { transform: translateX(-100%); }
+.activity-hour-axis span.first { transform: none; }
+.activity-hour-axis span.last { transform: translateX(-100%); }
 .activity-track-row { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: center; min-height: 78px; }
 .activity-track-label { display: grid; gap: 4px; color: #354c40; font-size: 12px; }
 .activity-track-label small { color: #95a198; font-size: 10px; }
@@ -319,7 +319,7 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-marker.endpoint { width: 16px; height: 16px; background: #218c63; box-shadow: 0 0 0 2px #d8efe3; }
 .activity-marker.endpoint.destination { background: #df5946; box-shadow: 0 0 0 2px #fae0dc; }
 .activity-marker.endpoint.pickup { background: #3978c5; box-shadow: 0 0 0 2px #dceafd; }
-.activity-event-list { display: grid; gap: 0; max-height: 274px; margin: 12px 0 0; padding: 0; overflow: auto; list-style: none; }
+.activity-event-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
 .activity-event { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 11px; padding: 12px 3px; border-top: 1px solid #edf1ee; }
 .activity-event-dot { width: 10px; height: 10px; margin: 4px 0 0 2px; border-radius: 50%; background: #95a49b; }
 .activity-event-dot.endpoint { background: #238e64; box-shadow: 0 0 0 3px #e6f4ec; }

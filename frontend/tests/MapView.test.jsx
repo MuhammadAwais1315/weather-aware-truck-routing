@@ -23,7 +23,8 @@ describe('MapLibre route and weather layers', () => {
     expect(map.options.style).toBe('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json')
     expect(map.options.attributionControl).toBe(true)
     expect(map.options.center).toEqual([-98, 39])
-    expect(map.getSource('route-lines').data.features[0].geometry).toEqual(routes[0].geometry)
+    expect(map.getSource('route-lines').data.features.find(feature => feature.properties.id === 'route-1').geometry).toEqual(routes[0].geometry)
+    expect(map.getSource('route-lines').data.features.at(-1).properties.id).toBe('route-1')
     const checkpoints = map.getSource('trip-checkpoints').data.features
     expect(checkpoints).toHaveLength(6)
     expect(checkpoints[0].geometry.coordinates).toEqual([-74, 40.7])

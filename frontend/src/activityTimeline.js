@@ -77,9 +77,39 @@ export function buildTripActivityTimeline(route, departureTime) {
   return {days, events, segments}
 }
 
-export function getTimelineEventPosition(timestamp) {
+const NICE_INTERVALS_MS = [5, 10, 15, 30, 60, 120, 180, 240, 360, 720].map(minutes => minutes * 60_000)
+
+export function getTimelineScale(events, segments = []) {
+  const values = [
+    ...(events || []).map(event => new Date(event.time).getTime()),
+    ...(segments || []).flatMap(segment => [new Date(segment.start).getTime(), new Date(segment.end).getTime()]),
+  ].filter(Number.isFinite)
+  if (!values.length) return {start: null, end: null, ticks: []}
+
+  const first = new Date(Math.min(...values))
+  const last = new Date(Math.max(...values))
+  const dayStart = localMidnight(dateKey(first)).getTime()
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+  const span = Math.max(last.getTime() - first.getTime(), 5 * 60_000)
+  const interval = NICE_INTERVALS_MS.find(value => value >= span / 4) || 720 * 60_000
+  const start = Math.max(dayStart, Math.floor(first.getTime() / interval) * interval)
+  let end = Math.min(dayEnd.getTime(), Math.ceil(last.getTime() / interval) * interval)
+  if (end - start < interval) end = Math.min(dayEnd.getTime(), start + interval)
+  if (end - start < interval) return {start, end, ticks: [start, end]}
+
+  const ticks = []
+  for (let tick = start; tick <= end; tick += interval) ticks.push(tick)
+  if (ticks.at(-1) !== end) ticks.push(end)
+  return {start, end, ticks}
+}
+
+export function getTimelineEventPosition(timestamp, scale) {
   const time = timestamp instanceof Date ? timestamp : new Date(timestamp)
   if (!Number.isFinite(time.getTime())) return null
+  if (scale?.start != null && scale?.end != null && scale.end > scale.start) {
+    return Math.min(100, Math.max(0, (time.getTime() - scale.start) / (scale.end - scale.start) * 100))
+  }
   const key = dateKey(time)
   const start = localMidnight(key)
   const end = new Date(start)

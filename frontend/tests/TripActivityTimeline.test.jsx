@@ -15,6 +15,15 @@ describe('trip activity timeline UI', () => {
     expect(screen.getByText(/not a driver duty-status log/)).toBeInTheDocument()
   })
 
+  it('spreads a short trip across the chart and renders every checkpoint event', () => {
+    const route = makeRoute('route-1', 'Short trip')
+    render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/> )
+    const markers = [...document.querySelectorAll('.activity-marker')].map(marker => Number.parseFloat(marker.style.left))
+    expect(markers.at(-1) - markers[0]).toBeGreaterThan(90)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(document.querySelector('.activity-event-list').style.maxHeight).toBe('')
+  })
+
   it('lets the user switch days for trips that span midnight', () => {
     const route = makeRoute()
     route.checkpoints = route.checkpoints.map((point, index) => ({

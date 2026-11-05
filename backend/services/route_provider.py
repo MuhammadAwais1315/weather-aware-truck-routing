@@ -1,10 +1,66 @@
 import os
 import math
+from bisect import bisect_right
 
 import requests
 
 from apps.checkpoints.services import haversine
 from .exceptions import ServiceError
+
+
+def _sample_route(coordinates, count=81):
+    lengths = [0.0]
+    for start, end in zip(coordinates, coordinates[1:]):
+        lengths.append(lengths[-1] + haversine(start, end))
+    total = lengths[-1]
+    if total <= 0:
+        return list(coordinates)
+    samples = []
+    for index in range(count):
+        target = total * index / (count - 1)
+        segment = min(bisect_right(lengths, target) - 1, len(coordinates) - 2)
+        segment = max(segment, 0)
+        segment_length = lengths[segment + 1] - lengths[segment]
+        fraction = (target - lengths[segment]) / segment_length if segment_length else 0
+        start, end = coordinates[segment], coordinates[segment + 1]
+        samples.append([start[0] + (end[0] - start[0]) * fraction, start[1] + (end[1] - start[1]) * fraction])
+    return samples
+
+
+def _point_to_route_distance(point, coordinates):
+    """Approximate closest point-to-segment distance in meters for a city-scale route."""
+    radius = 6_371_000
+    latitude = math.radians(point[1])
+    scale_x = math.cos(latitude)
+    px, py = radius * math.radians(point[0]) * scale_x, radius * latitude
+    closest_squared = float('inf')
+    for start, end in zip(coordinates, coordinates[1:]):
+        ax = radius * math.radians(start[0]) * scale_x - px
+        ay = radius * math.radians(start[1]) - py
+        bx = radius * math.radians(end[0]) * scale_x - px
+        by = radius * math.radians(end[1]) - py
+        dx, dy = bx - ax, by - ay
+        denominator = dx * dx + dy * dy
+        fraction = 0 if denominator == 0 else min(1, max(0, -(ax * dx + ay * dy) / denominator))
+        squared = (ax + fraction * dx) ** 2 + (ay + fraction * dy) ** 2
+        closest_squared = min(closest_squared, squared)
+    return math.sqrt(closest_squared)
+
+
+def _routes_are_near_duplicates(left, right):
+    """Detect alternatives that differ only by provider geometry jitter or a tiny merge."""
+    left_coordinates = left['geometry']['coordinates']
+    right_coordinates = right['geometry']['coordinates']
+    left_miles, right_miles = left['distance_miles'], right['distance_miles']
+    if max(left_miles, right_miles) <= 0 or abs(left_miles - right_miles) / max(left_miles, right_miles) > 0.015:
+        return False
+    left_samples, right_samples = _sample_route(left_coordinates), _sample_route(right_coordinates)
+    left_distances = sorted(_point_to_route_distance(point, right_coordinates) for point in left_samples)
+    right_distances = sorted(_point_to_route_distance(point, left_coordinates) for point in right_samples)
+    # 95% of both paths must lie within 125m. The symmetric check avoids treating
+    # a short route that is merely contained in a longer detour as a duplicate.
+    percentile = int(math.ceil(0.95 * len(left_samples))) - 1
+    return left_distances[percentile] <= 125 and right_distances[percentile] <= 125
 
 
 class OpenRouteServiceClient:
@@ -269,11 +325,26 @@ class OpenRouteServiceClient:
                 'OpenRouteService could not connect both route legs through the pickup.',
                 status_code=502, code='routing_disconnected_legs',
             )
-        # Keep the three fastest distinct, fully provider-derived combinations.
-        ranked = sorted(combinations, key=lambda route: route['duration_seconds'])[:3]
+        # Keep the three fastest geometrically distinct, fully provider-derived
+        # combinations. ORS can return small geometry variations that otherwise
+        # appear as separate route choices despite following the same corridor.
+        ranked = sorted(combinations, key=lambda route: route['duration_seconds'])
+        distinct = []
+        omitted_near_duplicates = False
+        for route in ranked:
+            if any(_routes_are_near_duplicates(route, previous) for previous in distinct):
+                omitted_near_duplicates = True
+                continue
+            distinct.append(route)
+            if len(distinct) == 3:
+                break
+        ranked = distinct
         for index, route in enumerate(ranked, start=1):
             route['id'] = f'route-{index}'
             route['name'] = f'Route {index}'
+            if omitted_near_duplicates:
+                note = 'Near-identical route paths were omitted; only distinct provider routes are shown.'
+                route['alternatives_note'] = f"{route['alternatives_note']} {note}" if route.get('alternatives_note') else note
         return ranked
 
     @staticmethod

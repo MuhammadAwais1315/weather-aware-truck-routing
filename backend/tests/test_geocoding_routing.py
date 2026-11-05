@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import requests
 from django.test import SimpleTestCase
@@ -165,6 +165,28 @@ class OpenRouteServiceClientTests(SimpleTestCase):
         self.assertEqual([route['id'] for route in routes], ['route-1', 'route-2', 'route-3'])
         self.assertEqual(len({tuple(map(tuple, route['geometry']['coordinates'])) for route in routes}), 3)
         self.assertTrue(all(len(route['provider_legs']) == 2 for route in routes))
+
+    def test_pickup_routes_drop_near_identical_provider_combinations(self):
+        def route(coordinates, distance, duration):
+            return {
+                'geometry': {'type': 'LineString', 'coordinates': coordinates},
+                'distance_meters': distance, 'duration_seconds': duration,
+                'distance_miles': distance / 1609.344, 'duration_hours': duration / 3600,
+                'summary': {}, 'steps': [],
+            }
+
+        first = route([[-74.0, 40.7], [-76.0, 41.0], [-78.0, 41.5]], 500_000, 20_000)
+        second_a = route([[-78.0, 41.5], [-82.0, 41.6], [-87.6, 41.9]], 800_000, 30_000)
+        # Small provider shape jitter on the same corridor must not be presented
+        # as a separate driver choice.
+        second_b = route([[-78.0, 41.5], [-82.0, 41.60004], [-87.6, 41.9]], 805_000, 30_100)
+        client = OpenRouteServiceClient(api_key='test-key', session=Mock())
+        with patch.object(client, 'get_routes', side_effect=[[first], [second_a, second_b]]):
+            routes = client._get_pickup_routes(self.origin, self.pickup, self.destination, 'driving-hgv')
+
+        self.assertEqual(len(routes), 1)
+        self.assertEqual(routes[0]['id'], 'route-1')
+        self.assertIn('Near-identical route paths were omitted', routes[0]['alternatives_note'])
 
     def test_long_trip_alternative_limit_retries_for_one_actual_route(self):
         limit_response = mocked_response({

@@ -151,8 +151,9 @@ function updateMap(map, data, shouldFit) {
   const { routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, pickup, destination, layers } = data
   const routeFeatures = routes.filter(route => route.geometry?.type === 'LineString' && route.geometry.coordinates?.length >= 2).map((route, index) => {
     const recommended = route.id === recommendedRouteId || route.recommended === true
-    return { type: 'Feature', geometry: route.geometry, properties: { id: route.id, name: route.name || `Route ${index + 1}`, color: recommended ? ROUTE_COLORS[0] : ROUTE_COLORS[(index % (ROUTE_COLORS.length - 1)) + 1], selected: route.id === selectedRouteId, recommended, visible: recommended || route.id === selectedRouteId || layers.alternatives } }
-  })
+    const selected = route.id === selectedRouteId
+    return { type: 'Feature', geometry: route.geometry, properties: { id: route.id, name: route.name || `Route ${index + 1}`, color: recommended ? ROUTE_COLORS[0] : ROUTE_COLORS[(index % (ROUTE_COLORS.length - 1)) + 1], selected, recommended, visible: recommended || selected || layers.alternatives } }
+  }).sort((left, right) => Number(left.properties.selected || left.properties.recommended) - Number(right.properties.selected || right.properties.recommended))
   const checkpointData = buildCheckpointGeoJSON(routes, departureTime, forecastHour, {
     selectedRouteId,
     includeAlternatives: layers.alternatives,
@@ -161,6 +162,7 @@ function updateMap(map, data, shouldFit) {
     selectedRouteId,
     includeAlternatives: layers.alternatives,
   })
+  tripCheckpointData.features.sort((left, right) => Number(left.properties.routeId === selectedRouteId) - Number(right.properties.routeId === selectedRouteId))
   const endpoints = []
   for (const [key, place, label, color] of [['origin', origin, 'Truck', '#23966c'], ['pickup', pickup, 'Pickup', '#3978c5'], ['destination', destination, 'Destination', '#dc513d']]) {
     const coordinate = safeCoordinate(place)

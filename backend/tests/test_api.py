@@ -87,6 +87,17 @@ class ApiEndpointTests(SimpleTestCase):
         self.assertEqual(response.json(), expected)
         geocode.assert_called_once_with('New York')
 
+    @patch('apps.routing.views.reverse_geocode')
+    def test_reverse_geocode_endpoint_returns_checkpoint_place_name(self, reverse_geocode):
+        reverse_geocode.return_value = {
+            'label': 'Lewisville, Texas',
+            'display_name': 'Lewisville, Denton County, Texas, United States',
+        }
+        response = self.client.get('/api/geocode/reverse/', {'lat': '33.0462', 'lon': '-96.9942'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['label'], 'Lewisville, Texas')
+        reverse_geocode.assert_called_once_with('33.0462', '-96.9942')
+
     def test_geocode_endpoint_rejects_short_query(self):
         response = self.client.get('/api/geocode/', {'q': 'NY'})
         self.assertEqual(response.status_code, 400)

@@ -87,6 +87,25 @@ class NominatimGeocoderTests(SimpleTestCase):
         self.assertEqual(geocoder.geocode('New York'), geocoder.geocode(' new york '))
         session.get.assert_called_once()
 
+    def test_reverse_lookup_returns_nearest_place_name_and_is_cached(self):
+        session = Mock()
+        session.get.return_value = mocked_response({
+            'name': 'Lewisville', 'display_name': 'Lewisville, Denton County, Texas, United States',
+            'address': {'town': 'Lewisville', 'county': 'Denton County', 'state': 'Texas'},
+        })
+        geocoder = NominatimGeocoder(session=session, min_interval_seconds=0)
+        expected = {'label': 'Lewisville, Texas', 'display_name': 'Lewisville, Denton County, Texas, United States'}
+
+        self.assertEqual(geocoder.reverse(33.0462, -96.9942), expected)
+        self.assertEqual(geocoder.reverse(33.0462, -96.9942), expected)
+        session.get.assert_called_once()
+        self.assertEqual(session.get.call_args.kwargs['params']['format'], 'jsonv2')
+
+    def test_reverse_lookup_rejects_invalid_coordinates(self):
+        geocoder = NominatimGeocoder(session=Mock(), min_interval_seconds=0)
+        with self.assertRaises(ServiceError):
+            geocoder.reverse(95, -96)
+
 
 class OpenRouteServiceClientTests(SimpleTestCase):
     def setUp(self):

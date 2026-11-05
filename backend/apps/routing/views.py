@@ -3,7 +3,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.geocoding.services import geocode_place
+from apps.geocoding.services import geocode_place, reverse_geocode
 from services.route_provider import openrouteservice_client
 from .serializers import PlanRequestSerializer
 
@@ -22,6 +22,15 @@ class GeocodeView(APIView):
         if len(query) < 3:
             raise ValidationError('Enter at least 3 characters.')
         return Response(geocode_place(query))
+
+
+class ReverseGeocodeView(APIView):
+    def get(self, request):
+        latitude = request.query_params.get('lat')
+        longitude = request.query_params.get('lon')
+        if latitude is None or longitude is None:
+            raise ValidationError('Provide checkpoint latitude and longitude.')
+        return Response(reverse_geocode(latitude, longitude))
 
 
 class AddressAutocompleteView(APIView):

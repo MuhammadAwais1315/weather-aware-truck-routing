@@ -323,6 +323,7 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-event-title { display: flex; align-items: baseline; gap: 10px; color: #31483c; font-size: 12px; }
 .activity-event-main p { margin: 3px 0 0; color: #7c8a82; font-size: 10px; line-height: 1.45; }
 .activity-stop-meta { color: #65746c !important; }
+.activity-place-name { color: #2f5443; font-weight: 700; }
 .activity-stop-trailing { display: grid; justify-items: end; gap: 6px; }
 .activity-event-time { padding: 5px 9px; border: 1px solid #e1e7ed; border-radius: 7px; background: #f8fafc; color: #334b65; font-size: 10px; font-weight: 650; text-align: right; white-space: nowrap; }
 .activity-risk { padding: 4px 8px; border-radius: 999px; background: #eef2ef; color: #6c7c73; font-size: 10px; font-weight: 700; }

@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test'
-import {makePlan, makeRoute} from '../tests/fixtures.js'
+import {makeCheckpoint, makePlan, makeRoute} from '../tests/fixtures.js'
 
 async function stubProviders(page, plans, {planDelay = 0} = {}) {
   const requests = []
@@ -7,6 +7,7 @@ async function stubProviders(page, plans, {planDelay = 0} = {}) {
     {label: 'New York, NY, USA', longitude: -74, latitude: 40.7},
     {label: 'Newark, NJ, USA', longitude: -74.17, latitude: 40.73},
   ]}}))
+  await page.route('**/geocode/reverse**', route => route.fulfill({json: {label: 'Lewisville, Texas', display_name: 'Lewisville, Denton County, Texas, United States'}}))
   await page.route('**/api/plan/', async route => {
     const request = route.request().postDataJSON()
     requests.push(request)
@@ -107,6 +108,23 @@ test('a second journey submission removes old route cards and old map instance',
   await expect(page.locator('.maplibregl-canvas')).toHaveCount(1)
   expect(requests).toHaveLength(2)
   expect(requests[1]).toMatchObject({origin: 'Albany, NY', pickup: 'New York, NY', destination: 'Philadelphia, PA'})
+})
+
+test('weather checkpoints are labeled with their nearby place names', async ({page}) => {
+  const route = makeRoute('route-1', 'Named checkpoint route')
+  route.checkpoints.splice(2, 0, {
+    ...makeCheckpoint('weather-denton', -96.9942, 33.0462, 25),
+    checkpoint_type: 'weather', estimated_arrival_time: '2026-11-03T15:20:00Z',
+  })
+  const plan = makePlan({routes: [route], recommendedId: 'route-1'})
+  await stubProviders(page, [plan])
+  await page.goto('/')
+  await fillJourney(page)
+  await page.getByRole('button', {name: 'Analyze routes'}).click()
+  await expect(page.getByRole('heading', {name: 'Compare 1 route'})).toBeVisible()
+  await page.getByRole('tab', {name: 'Timeline'}).click()
+  await expect(page.getByText('Lewisville, Texas')).toBeVisible()
+  await expect(page.locator('.activity-stop-meta').filter({hasText: 'Lewisville, Texas'})).toContainText('25.0 mi from origin')
 })
 
 test('dashboard fits mobile, tablet, and desktop widths without horizontal overflow', async ({page}) => {

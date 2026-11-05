@@ -32,6 +32,7 @@ export function buildTripActivityTimeline(route, departureTime) {
       title: {start: 'Trip start', pickup: 'Pickup', dropoff: 'Drop-off', weather: 'Weather checkpoint'}[kind],
       location: point.location_label || null,
       distance: Number(point.distance_from_origin_miles ?? point.distance_miles ?? 0),
+      coordinates: Array.isArray(point.coordinates) ? point.coordinates : [point.longitude, point.latitude],
       risk: point.risk?.level || 'unknown',
       riskScore: point.risk?.final_risk_score ?? point.risk?.score ?? null,
       weather: point.weather || null,

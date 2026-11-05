@@ -1,7 +1,9 @@
 import {fireEvent, render, screen} from '@testing-library/react'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, vi} from 'vitest'
 import TripActivityTimeline from '../src/components/TripActivityTimeline.jsx'
-import {makeRoute} from './fixtures.js'
+import {makeCheckpoint, makeRoute} from './fixtures.js'
+
+vi.mock('../src/api.js', () => ({reverseGeocode: vi.fn(async () => ({label: 'Lewisville, Texas'}))}))
 
 describe('trip activity timeline UI', () => {
   it('shows the itinerary rail with actual arrival dates, risk and weather values', () => {
@@ -53,5 +55,17 @@ describe('trip activity timeline UI', () => {
     render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/>)
     expect(screen.getByText('Risk scores are unavailable for these forecast checkpoints.')).toBeInTheDocument()
     expect(document.querySelector('.risk-line')).not.toBeInTheDocument()
+  })
+
+  it('labels each weather checkpoint with the nearby place name from its coordinates', async () => {
+    const route = makeRoute('route-1', 'Named checkpoints')
+    route.checkpoints.splice(2, 0, {
+      ...makeCheckpoint('named-weather-point', -96.9942, 33.0462, 25),
+      checkpoint_type: 'weather', estimated_arrival_time: '2026-11-03T15:20:00Z',
+    })
+    render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/>)
+    expect(await screen.findByText('Lewisville, Texas')).toBeInTheDocument()
+    const locationLine = [...document.querySelectorAll('.activity-stop-meta')].find(element => element.textContent.includes('Lewisville, Texas'))
+    expect(locationLine.textContent).toContain('25.0 mi from origin')
   })
 })

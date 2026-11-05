@@ -1,4 +1,5 @@
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
+import {reverseGeocode} from '../api.js'
 import {buildRiskTimelineGraph, buildTripActivityTimeline, formatTimelineDateTime} from '../activityTimeline.js'
 
 const weatherSummary = weather => {
@@ -44,8 +45,31 @@ function RiskTimelineGraph({events}) {
 export default function TripActivityTimeline({route, departureTime}) {
   const model = useMemo(() => buildTripActivityTimeline(route, departureTime), [route, departureTime])
   const [selectedDay, setSelectedDay] = useState('')
+  const [placeNames, setPlaceNames] = useState({})
   const dayKey = model.days.some(day => day.key === selectedDay) ? selectedDay : model.days[0]?.key
-  const dayEvents = model.events.filter(event => event.day === dayKey)
+  const dayEvents = useMemo(() => model.events.filter(event => event.day === dayKey), [model.events, dayKey])
+  const placeLookupEvents = useMemo(() => dayEvents.filter(event => event.kind === 'weather' && !event.location
+    && Array.isArray(event.coordinates) && event.coordinates.length >= 2
+    && event.coordinates.every(value => Number.isFinite(Number(value)))), [dayEvents])
+
+  useEffect(() => {
+    if (!placeLookupEvents.length) return undefined
+    let active = true
+    async function resolvePlaceNames() {
+      for (const event of placeLookupEvents) {
+        if (!active) return
+        const key = `${Number(event.coordinates[1]).toFixed(4)},${Number(event.coordinates[0]).toFixed(4)}`
+        try {
+          const result = await reverseGeocode(event.coordinates[1], event.coordinates[0])
+          if (active) setPlaceNames(current => ({...current, [key]: result.label || result.display_name || 'Nearby place'}))
+        } catch {
+          if (active) setPlaceNames(current => ({...current, [key]: 'Place name unavailable'}))
+        }
+      }
+    }
+    resolvePlaceNames()
+    return () => { active = false }
+  }, [placeLookupEvents])
 
   if (!model.events.length) {
     return <section className="trip-activity-view" aria-label="Trip activity timeline"><p className="activity-empty">Checkpoint arrival times are not available for this route.</p></section>
@@ -75,11 +99,13 @@ export default function TripActivityTimeline({route, departureTime}) {
         {dayEvents.map(event => {
           const meta = STOP_META[event.kind] || STOP_META.weather
           const risk = RISK_LABELS[event.risk] || 'Unknown'
+          const coordinateKey = `${Number(event.coordinates?.[1]).toFixed(4)},${Number(event.coordinates?.[0]).toFixed(4)}`
+          const placeName = event.location || placeNames[coordinateKey] || (event.kind === 'weather' ? 'Finding nearby place…' : '')
           return <li key={event.id} className={`activity-event event-${event.kind}`}>
             <span className={`activity-stop-icon stop-${event.kind} risk-${event.risk}`} aria-hidden="true">{meta.icon}</span>
             <div className="activity-event-main">
               <div className="activity-event-title"><b>{meta.title}</b></div>
-              <p className="activity-stop-meta">{event.location ? `${event.location} · ` : ''}{event.distance.toFixed(1)} mi from origin</p>
+              <p className="activity-stop-meta"><span className="activity-place-name">{placeName || (event.kind === 'weather' ? 'Weather checkpoint' : '')}</span>{placeName ? ' · ' : ''}{event.distance.toFixed(1)} mi from origin</p>
               <p className="activity-stop-weather">{weatherSummary(event.weather)}</p>
             </div>
             <div className="activity-stop-trailing">

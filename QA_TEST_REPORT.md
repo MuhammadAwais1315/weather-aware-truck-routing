@@ -1,7 +1,7 @@
 # Weather-Aware Truck Routing — QA Test Report
 
-**Date:** 2026-11-03  
-**Environment:** Local Django development server (`127.0.0.1:8000`), Vite (`127.0.0.1:5174`), Edge browser, Docker Python 3.12.  
+**Date:** 2026-11-05
+**Environment:** Windows PowerShell, Python 3.12.10, Django, Vite, Playwright, and public Vercel production frontend/API.
 **Scope:** Complete user journey, real provider connectivity where configured, automated backend/frontend suites, browser behavior, application logs, and production frontend build.
 
 **Publishing status:** Private GitHub repo [MuhammadAwais1315/weather-aware-truck-routing](https://github.com/MuhammadAwais1315/weather-aware-truck-routing), `main` includes current deployment changes. Vercel production frontend: [weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app/). Vercel production API: [weather-aware-truck-routing-api-kappa.vercel.app](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/).
@@ -10,25 +10,26 @@
 
 | Area | Result |
 |---|---|
-| Django tests | **104 passed**, 0 failed, 0 skipped |
-| React/Vitest tests | **36 passed**, 0 failed, 0 skipped |
-| Playwright browser tests | **4 passed**, 0 failed, 0 skipped |
-| Total automated tests | **144 passed**, 0 failed, 0 skipped |
+| Django tests | **121 passed**, 0 failed, 0 skipped |
+| React/Vitest tests | **53 passed**, 0 failed, 0 skipped |
+| Playwright browser tests | **5 passed**, 0 failed, 0 skipped |
+| Total automated tests | **179 passed**, 0 failed, 0 skipped |
+| Backend statement/branch coverage | **83.0%** (1,266 statements, 424 branches) |
 | Production frontend build | Passed; Vite reports a large JavaScript chunk warning |
 | Public Vercel frontend | Page and React form returned HTTP 200; live journey succeeded; Edge smoke had 0 page errors, console errors or failed HTTP responses |
 | Public Vercel backend | Django deployed; `/api/health/` returned HTTP 200 JSON with status `ok` and version `1.0.0` |
 | Production CORS | Preflight from the deployed frontend origin returned HTTP 200 and `Access-Control-Allow-Origin` matched exactly |
 | Public frontend-to-backend request | Edge browser fetched backend health successfully from the production dashboard; no uncaught page errors |
-| Public journey submission | New York to Boston returned HTTP 200 with one provider route, six checkpoints, weather at all six, recommendation `route-1`, and route summary |
-| Public full route workflow | Verified in Edge: form → live backend analysis → route card/recommendation → map canvas and worker → forecast slider. No console or HTTP errors. This 219.2-mile trip returned one route due to the provider's 100 km alternative calculation limit |
+| Public journey submission | New York → Hartford → Boston returned HTTP 200 with three distinct provider routes and 34 checkpoints total (12/11/11) |
+| Public full route workflow | Verified with live Nominatim, ORS, and Open-Meteo: all 34 checkpoints had ETA-matched weather; selected-hour forecast returned 34/34. Zero page, console, HTTP, or failed-request errors |
 | Road map readability | Road network, city labels, attribution and route overlays render clearly | Replaced the sparse MapLibre demo basemap with CARTO Voyager. Live St. Louis County-to-Dallas map loaded its road labels/tiles, the route and checkpoints, and CARTO/OSM attribution; 0 HTTP or console errors |
 | Live Nominatim geocoding | Passed |
 | Live Open-Meteo hourly forecast | Passed, including requested units and UTC timestamp matching |
 | Live complete plan request | Passed with configured production key; the 50-mile checkpoint interval returned 6/6 checkpoints with forecast weather |
 
-Automated test counts above are actual executed results. The 137 tests use mocked provider responses where necessary. Provider-specific Nominatim and Open-Meteo requests and the complete public route workflow were live. The long trip returned one actual route because openrouteservice limits alternative calculations to trips under 100 km; no route data was fabricated.
+Automated test counts above are actual executed results. Provider unit tests mock external APIs; the production smoke used live Nominatim, ORS, and Open-Meteo. The public backend health endpoint returned HTTP 200 with version `1.0.0`.
 
-The backend suite last completed with 104 passing tests. The earlier Coverage.py run measured 85.0% branch coverage at 101 tests; coverage was not recalculated after the latest three backend regression tests. Frontend tests do not currently have a coverage provider, so a frontend coverage percentage is unavailable. See [TESTING.md](TESTING.md).
+Frontend tests do not currently have a coverage provider, so a frontend coverage percentage is unavailable. See [TESTING.md](TESTING.md).
 
 ## Follow-up verification — 2026-11-05
 
@@ -40,38 +41,49 @@ The original `weather-aware-truck-routing.vercel.app` alias remained assigned to
 
 - Added `POST /api/weather/route-forecast/` so the 0–48-hour slider requests weather for all displayed route checkpoints at the selected timestamp. The exploratory response is held separately from trip ETA weather. The frontend debounces requests, cancels stale requests, caches selected hours in memory, and draws selected-time heatmap/checkpoint layers without changing trip risk results.
 - Batched checkpoint coordinates into Open-Meteo multi-location calls (up to 100 coordinates/request), bounded the in-process weather cache, and added DRF scoped throttles configurable through environment variables.
-- Added API, batching/cache, UI data flow, and all-unsafe recommendation regression coverage. The latest executed Vitest run passed **53/53**, including selected-hour weather populating all route checkpoint statuses and all-unsafe presentation. `python -m compileall` could not execute because this Windows environment has no installed runnable Python interpreter. Therefore the changed Django suite, checks, and coverage have **not** been verified in this run; the earlier 104-test and 85% results are historical.
+- Added API, batching/cache, UI data flow, and all-unsafe recommendation regression coverage. The latest Vitest run passed **53/53**. The Django suite, checks, and coverage were subsequently run with Python 3.12.10 and pass (121 tests; 83.0% coverage).
 - The first Playwright run exposed a map integration defect: `App` passed a GeoJSON object where `MapView` expected the raw forecast array, causing an uncaught `flatMap is not a function` error. The map crashed and the forecast status stayed on “Loading.” The data contract is fixed; the targeted slider workflow passed, then the complete Playwright suite passed **5/5**. The selected-hour checkpoint count now reaches `6 of 6` in the browser test.
 - `npm run build` succeeded. Initial app JS is 324 KB (104 KB gzip); the lazy-loaded MapLibre view is 1,090 KB (299 KB gzip) and still triggers Vite's >500 KB advisory. Map code is deferred until needed, but further chunk analysis can improve map-first loading.
-- These changes have not been redeployed or live-verified. The public deployment URLs above refer to the previously verified build and do not yet prove the new selected-hour API is available in production.
+- These changes have been deployed to Vercel and verified with the live three-location workflow documented below.
 
 ## Scenario results
+
+### Current public production smoke — 2026-11-05
+
+| Scenario | Expected | Actual | Result |
+|---|---|---|---|
+| Public backend health | Healthy API and version response | HTTP 200; status `ok`, version `1.0.0` | **PASS** |
+| Three-location journey | Geocode truck, pickup, and destination; return provider routes | Live plan returned HTTP 200 with 3 distinct route geometries | **PASS** |
+| Route checkpoints and ETA weather | Generate actual route checkpoints and find hourly weather at each ETA | 34 checkpoints across routes (12/11/11); weather available and ETA-matched for all 34 | **PASS** |
+| Selected forecast hour | Return actual weather at the slider's selected timestamp for all route checkpoints | HTTP 200; 34 checkpoints requested, 34 available | **PASS** |
+| Public browser health | No runtime, console, network, or page failures during journey and slider workflow | 0 page errors, 0 console errors, 0 HTTP errors, 0 failed requests | **PASS** |
+
+The live smoke selected an exploratory time 12 hours after departure. The returned live conditions happened to classify as Low; severe and No Travel behavior is verified by threshold and load-boundary backend tests, not claimed from this particular weather sample.
 
 ## Assessment requirements audit — 2026-11-05
 
 | Assessment requirement | QA result | Evidence / remaining qualification |
 |---|---|---|
 | Origin, departure date/time, load weight; three routing locations in current product | **Implemented** | Current product extends the PDF's origin/destination form with truck location → pickup → destination; frontend tests cover the request payload and unit conversion. |
-| Three provider route options; real alternatives only | **Implemented with provider limitation** | ORS is asked for real alternatives for both pickup legs and real leg alternatives are combined. Long legs can return one actual path; routes are deliberately not fabricated. Live three-route behavior was not re-run during this audit. |
+| Three provider route options; real alternatives only | **Implemented with provider limitation** | ORS is asked for real alternatives for both pickup legs and real leg alternatives are combined. Public live journey returned three distinct route geometries; longer trips can return fewer due to provider constraints. |
 | 10/25/50-mile checkpoints, coordinates, distance, progress, ETA | **Implemented; backend suite passes** | Current 121-test run covers cumulative route geometry, interpolation, provider segment durations, endpoints, and ETAs. |
 | ETA-specific hourly wind/rain/snow and conversions | **Implemented; backend suite passes** | Current suite covers UTC matching, unit conversions, nulls, missing hours, batching, caching, and API failures. |
 | Weather thresholds and load rules | **Implemented; backend suite passes** | Boundary tests cover all bands and load cutoffs. |
 | Severe/high miles and exact recommendation priority; unsafe handling | **Implemented; backend suite passes** | Segment-distance aggregation, ranking priorities, incomplete forecasts, and all-unsafe routes are covered. |
 | Map, routes, checkpoints, ETA/risk popups, route summary | **Implemented; browser suite passes** | Current Playwright map and timeline workflows passed using deterministic mocked API responses. They do not establish current live provider behavior. |
-| Weather heatmap and 0–48-hour slider | **Implemented; browser suite passes against mocked forecast API** | Browser test confirms selected hour calls all displayed checkpoints and updates the visible availability count; current public API deployment has not been checked for this new endpoint. |
+| Weather heatmap and 0–48-hour slider | **Implemented; automated and live checks pass** | Browser suite verifies slider behavior; public selected-hour endpoint returned weather for all 34 route checkpoints in the live run. |
 | README, screenshots, architecture, limitations, testing guide, walkthrough script | **Implemented** | Screenshots and demo script are present. The PDF specifically asks for a 5–10 minute Loom walkthrough: an actual recorded Loom video is not present in the repository. |
-| GitHub and hosted application | **Previously published; current revision not verified/published** | This audit only checked the local checkout. Current changes are not confirmed pushed or deployed. |
+| GitHub and hosted application | **Published and current production verified** | Latest application revision is deployed on Vercel; public health, live planning, selected-hour forecast and browser errors were checked. |
 
 ### Findings requiring attention
 
-1. **High — Current production deployment is not verified.** The public Vercel build may not yet contain the selected-hour forecast endpoint and latest frontend integration. Deploy the current tested revision and recheck live planning plus `/api/weather/route-forecast/` before claiming the full public workflow passes.
-2. **Medium — Shared rate limits need a Redis service URL.** Code now supports `REDIS_URL`; without a provisioned value, the application uses local memory and counters are per process. Add a managed Redis/Upstash connection in the deployment environment if global throttling is a requirement.
-3. **Assessment deliverable — The Loom video is not recorded.** The 7–9 minute script exists, but the PDF asks for a recorded 5–10 minute walkthrough.
-4. **Low — The MapLibre chunk remains large.** Build passes, and the map bundle is lazy-loaded, but the map chunk is 1,090 KB (299 KB gzip) and Vite emits the 500 KB advisory.
+1. **Medium — Shared rate limits need a Redis service URL.** Code supports `REDIS_URL`; without a provisioned value, the application uses local memory and counters are per process. Add managed Redis/Upstash in deployment if global throttling is required.
+2. **Assessment deliverable — The Loom video is not recorded.** The 7–9 minute script exists, but the PDF asks for a recorded 5–10 minute walkthrough.
+3. **Low — The MapLibre chunk remains large.** Build passes, and the map bundle is lazy-loaded, but the map chunk is 1,090 KB (299 KB gzip) and Vite emits the 500 KB advisory.
 
 ### Latest local execution
 
-`npm run test:all`: Vitest **53 passed, 0 failed**; Playwright **5 passed, 0 failed**. `npm run build`: passed with the MapLibre chunk advisory above. `python manage.py check`: passed. Django suite: **121 passed, 0 failed**. Coverage.py: **83.0%** line/branch coverage. Live providers and public deployment: **not tested in this audit**. Frontend source coverage: **not measured**.
+`npm run test:all`: Vitest **53 passed, 0 failed**; Playwright **5 passed, 0 failed**. `npm run build`: passed with the MapLibre chunk advisory above. `python manage.py check`: passed. Django suite: **121 passed, 0 failed**. Coverage.py: **83.0%** line/branch coverage. Live public plan and forecast passed: 3 distinct routes, 34 ETA-matched forecasts, 34/34 exploratory forecasts, and no browser/HTTP errors. Frontend source coverage: **not measured**.
 
 ### Remediation and backend verification — 2026-11-05
 

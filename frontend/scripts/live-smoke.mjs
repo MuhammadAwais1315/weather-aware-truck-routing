@@ -58,6 +58,24 @@ try {
       httpStatus: planResponse.status(),
       routeCount: Array.isArray(planBody.routes) ? planBody.routes.length : null,
       checkpointCounts: Array.isArray(planBody.routes) ? planBody.routes.map(route => route.checkpoints?.length ?? 0) : [],
+      distinctGeometryCount: Array.isArray(planBody.routes)
+        ? new Set(planBody.routes.map(route => JSON.stringify(route.geometry?.coordinates || []))).size
+        : null,
+      routeWeather: Array.isArray(planBody.routes) ? planBody.routes.map(route => {
+        const checkpoints = route.checkpoints || []
+        const available = checkpoints.filter(point => point.weather?.available === true)
+        return {
+          totalCheckpoints: checkpoints.length,
+          weatherAvailable: available.length,
+          etaMatchedForecasts: available.filter(point => {
+            const eta = Date.parse(point.estimated_arrival_time || point.arrival_time)
+            const forecast = Date.parse(point.weather.forecast_time)
+            return Number.isFinite(eta) && Number.isFinite(forecast) && Math.abs(eta - forecast) <= 30 * 60 * 1000
+          }).length,
+          riskLabels: [...new Set(checkpoints.map(point => point.risk?.risk_label).filter(Boolean))],
+          loadOverrides: checkpoints.filter(point => point.risk?.load_override?.applied === true).length,
+        }
+      }) : [],
       visibleError,
     },
     selectedForecast: forecastResponse ? {
@@ -76,6 +94,7 @@ try {
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   if (
     planResponse.status() !== 200 || !planBody.routes?.length
+    || new Set(planBody.routes.map(route => JSON.stringify(route.geometry?.coordinates || []))).size !== planBody.routes.length
     || !forecastResponse || forecastResponse.status() !== 200
     || !Array.isArray(forecastBody.forecasts)
     || pageErrors.length || consoleErrors.length

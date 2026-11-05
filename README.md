@@ -277,7 +277,7 @@ coverage run --data-file=.coverage manage.py test tests
 coverage report --data-file=.coverage -m
 ```
 
-For suite scope, actual run dates/counts, and live-versus-mocked details, read [`TESTING.md`](TESTING.md) and [`QA_TEST_REPORT.md`](QA_TEST_REPORT.md). Automated provider tests use mocks; they do not prove that a live provider is currently available. An optional live browser smoke (`npm run qa:live`) requires both local servers and a valid ORS key.
+For suite scope, actual run dates/counts, and live-versus-mocked details, read [`TESTING.md`](TESTING.md) and [`QA_TEST_REPORT.md`](QA_TEST_REPORT.md). Automated provider tests use mocks; the live browser smoke (`npm run qa:live`) can use local servers or a public frontend with `QA_FRONTEND_URL`, plus a valid backend ORS key.
 
 ## Deployment status
 
@@ -286,7 +286,7 @@ The project source is in the private GitHub repository [MuhammadAwais1315/weathe
 - **Frontend:** [https://weather-aware-truck-routing-psi.vercel.app](https://weather-aware-truck-routing-psi.vercel.app)
 - **Django API health:** [https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/)
 - The prior `weather-aware-truck-routing.vercel.app` alias is assigned to an existing deployment and did not accept reassignment during the last deployment; use the frontend URL above for the latest build.
-- A live production New York–Boston journey previously returned one actual route and rendered its checkpoints/map. ORS alternatives are unavailable for that longer than 100 km request, so the UI reported one route instead of fabricating alternatives.
+- On 2026-11-05, a live New York → Hartford → Boston production journey returned **3 distinct provider routes**, with 34/34 checkpoint forecasts available at their estimated arrival times. The 12-hour exploratory forecast returned 34/34 weather records; browser console and HTTP error counts were zero.
 - [`render.yaml`](render.yaml) prepares Render as an alternative backend host; the current production API is on Vercel. Render is not claimed as a verified deployment.
 
 ### Deployment configuration

@@ -8,6 +8,7 @@ WeatherRoute is a responsive React dashboard backed by Django REST Framework. It
 
 - Truck current location, freight pickup, and final destination autocomplete; departure date/time, load weight in pounds, and 10/25/50-mile checkpoint interval.
 - Each returned provider alternative routes in order from truck to pickup to final destination. The pickup is included as a route checkpoint, with per-leg distance and estimated arrival summaries.
+- Driver-friendly, turn-by-turn directions for both route legs, with provider maneuver text, road name, distance, and estimated maneuver time.
 - Up to three **provider-returned** ORS driving alternatives. The application never fabricates missing alternatives.
 - Nominatim forward geocoding and ORS Pelias autocomplete.
 - Distance-based checkpoints on actual route geometry, including origin and destination; cumulative-distance interpolation and segment duration ETAs when the provider supplies them.
@@ -167,7 +168,7 @@ Request:
 }
 ```
 
-Response top-level fields include `origin`, `pickup`, `destination`, `departure_time`, `load_weight_tons`, `checkpoint_interval_miles`, `routes`, `recommendation`, `recommended_route_id`, `ranked_routes`, `route_summaries`, `ranking_explanation` and `routing_notice`. Each route includes two `legs` (`origin → pickup`, then `pickup → destination`) and checkpoints that include the pickup location.
+Response top-level fields include `origin`, `pickup`, `destination`, `departure_time`, `load_weight_tons`, `checkpoint_interval_miles`, `routes`, `recommendation`, `recommendation_status`, `recommended_route_id`, `ranked_routes`, `route_summaries`, `ranking_explanation` and `routing_notice`. Each route includes two `legs` (`origin → pickup`, then `pickup → destination`) and checkpoints that include the pickup location. Each leg includes provider-supplied turn-by-turn `steps` with instruction text, road name, distance and duration.
 
 Each route includes `id`, `name`, GeoJSON `geometry` (`LineString`, coordinate order `[longitude, latitude]`), `distance_miles`, `duration_hours`, provider summary, `checkpoints`, `metrics`, and `recommended`. A checkpoint includes `id`, `latitude`, `longitude`, `coordinates`, `distance_from_origin_miles`, `distance_to_next_checkpoint_miles`, `progress_percent`, timezone-aware `estimated_arrival_time`, `weather`, and `risk`. Weather reports `available`, `forecast_time`, requested/matched time, nullable values (`wind_speed_mph`, `rain_inches_per_hour`, `snowfall_inches_per_hour`) and `units`. Risk includes component risks, `risk_label`, `final_risk_score`, `load_override`, and `explanation`. Route metrics include severe/high miles, distance-weighted average risk and No Travel segments. See `frontend/src/contracts.js` and the mocked API fixtures in `frontend/tests/fixtures.js` for the runtime response contract.
 

@@ -80,6 +80,7 @@ class OpenRouteServiceClient:
             'coordinates': [[float(place['longitude']), float(place['latitude'])] for place in places],
             'alternative_routes': {'target_count': 3, 'weight_factor': 1.6, 'share_factor': 0.6},
             'instructions': True,
+            'instructions_format': 'text',
         }
         alternatives_limited_note = None
         try:
@@ -142,6 +143,7 @@ class OpenRouteServiceClient:
                         'profile': profile,
                     },
                 }
+                route['steps'] = self._route_steps(properties)
                 if via_points:
                     provider_segments = properties.get('segments')
                     if not isinstance(provider_segments, list) or len(provider_segments) != len(places) - 1:
@@ -240,11 +242,13 @@ class OpenRouteServiceClient:
                             'distance_miles': first['distance_meters'] / 1609.344,
                             'duration_seconds': first['duration_seconds'],
                             'waypoint_coordinate': first_coords[-1],
+                            'steps': first.get('steps', []),
                         },
                         {
                             'distance_meters': second['distance_meters'],
                             'distance_miles': second['distance_meters'] / 1609.344,
                             'duration_seconds': second['duration_seconds'],
+                            'steps': second.get('steps', []),
                         },
                     ],
                     'waypoint_distances_miles': [first['distance_meters'] / 1609.344],
@@ -271,6 +275,43 @@ class OpenRouteServiceClient:
             route['id'] = f'route-{index}'
             route['name'] = f'Route {index}'
         return ranked
+
+    @staticmethod
+    def _route_steps(properties):
+        """Normalize ORS maneuver instructions without trusting provider markup."""
+        result = []
+        segments = properties.get('segments', [])
+        if not isinstance(segments, list):
+            return result
+        for segment in segments:
+            if not isinstance(segment, dict):
+                continue
+            steps = segment.get('steps', [])
+            if not isinstance(steps, list):
+                continue
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                instruction = step.get('instruction')
+                if not isinstance(instruction, str) or not instruction.strip():
+                    continue
+                try:
+                    distance_meters = float(step.get('distance', 0))
+                    duration_seconds = float(step.get('duration', 0))
+                except (TypeError, ValueError):
+                    continue
+                if (not math.isfinite(distance_meters) or distance_meters < 0
+                        or not math.isfinite(duration_seconds) or duration_seconds < 0):
+                    continue
+                result.append({
+                    'instruction': instruction.strip(),
+                    'road_name': str(step.get('name') or '').strip(),
+                    'distance_meters': distance_meters,
+                    'distance_miles': round(distance_meters / 1609.344, 2),
+                    'duration_seconds': duration_seconds,
+                    'duration_minutes': round(duration_seconds / 60),
+                })
+        return result
 
     @staticmethod
     def _validate_place(place, name):

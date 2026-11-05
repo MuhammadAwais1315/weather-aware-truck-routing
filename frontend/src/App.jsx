@@ -3,6 +3,7 @@ import PlannerForm from './components/PlannerForm.jsx'
 import MapView from './components/MapView.jsx'
 import TripActivityTimeline from './components/TripActivityTimeline.jsx'
 import RouteCard from './components/RouteCard.jsx'
+import RouteDirections from './components/RouteDirections.jsx'
 import {planRoute} from './api.js'
 import {buildCheckpointGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
 import {createRequestGate} from './requestGate.js'
@@ -66,6 +67,8 @@ export default function App(){
     {routes.length>0&&<div className="comparison-grid">{routes.map(route=><RouteCard key={route.id} route={route} summary={routeSummaries.get(route.id)} departureTime={plan.departure_time} active={active?.id===route.id} onClick={()=>setSelected(route.id)}/>)}</div>}
     <div className={`recommendation result-recommendation ${plan.recommended_route_id?'':plan.recommendation_status==='incomplete_forecasts'?'incomplete':'unsafe'}`}><span className="rec-icon">{plan.recommended_route_id?'✦':'!'}</span><div><b>{plan.recommended_route_id?'Recommended route':plan.recommendation_status==='incomplete_forecasts'?'Forecast coverage incomplete':'No safe route available'}</b><p>{plan.ranking_explanation||plan.recommendation?.reason}</p></div></div>
    </section>
+
+   {active&&<RouteDirections route={active}/>}
 
    {routes.length>0&&<section className="analysis-layout">
     <div className="map-panel"><div className="map-toolbar"><div className="map-label"><span className="map-pin">⌖</span><div><b>{active?`${plan.origin.label.split(',')[0]} → ${plan.pickup.label.split(',')[0]} → ${plan.destination.label.split(',')[0]}`:'Route overview'}</b><small>{active?`${active.distance_miles.toLocaleString()} miles · ${active.duration_hours} hours`:'Select a route to inspect its path and activities'}</small></div></div><div className="activity-toolbar-actions"><div className="legend"><span><i className="dot low"/>Low</span><span><i className="dot moderate"/>Moderate</span><span><i className="dot high"/>High</span><span><i className="dot severe"/>Severe</span><span><i className="dot no-travel"/>No travel</span></div><div className="activity-view-switch" role="tablist" aria-label="Trip view"><button type="button" role="tab" aria-selected={activityView==='map'} onClick={()=>setActivityView('map')}>Map</button><button type="button" role="tab" aria-selected={activityView==='timeline'} onClick={()=>setActivityView('timeline')}>Timeline</button></div></div></div>

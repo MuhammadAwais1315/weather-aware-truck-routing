@@ -52,6 +52,7 @@ def build_plan(payload):
                 'duration_hours': round(provider_leg['duration_seconds'] / 3600, 2),
                 'departure_time': leg_departure.isoformat(),
                 'estimated_arrival_time': leg_arrival.isoformat(),
+                'steps': provider_leg.get('steps', []),
             })
         checkpoints = []
         hours = route['duration_seconds'] / 3600

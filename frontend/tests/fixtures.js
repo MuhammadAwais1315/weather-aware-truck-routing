@@ -21,9 +21,10 @@ export function makeCheckpoint(id, longitude, latitude, miles, riskLevel = 'low'
 
 export function makeRoute(id, name, {recommended = false, risk = 'low', distance = 100} = {}) {
   const legDistance = distance / 2
+  const routeIndex = Number(String(id).match(/(\d+)$/)?.[1] || 1) - 1
   return {
     id, name, recommended, distance_miles: distance, duration_hours: 2,
-    geometry: {type: 'LineString', coordinates: [[-74, 40.7], [-73.5, 41.76], [-73, 41.5]]},
+    geometry: {type: 'LineString', coordinates: [[-74, 40.7], [-73.5 + routeIndex * 0.12, 41.76], [-73, 41.5]]},
     legs: [
       {id: 'leg-1', from: {label: 'Truck'}, to: {label: 'Pickup'}, distance_miles: legDistance, duration_hours: 1, departure_time: '2026-11-03T14:00:00Z', estimated_arrival_time: '2026-11-03T15:00:00Z'},
       {id: 'leg-2', from: {label: 'Pickup'}, to: {label: 'Destination'}, distance_miles: legDistance, duration_hours: 1, departure_time: '2026-11-03T15:00:00Z', estimated_arrival_time: '2026-11-03T16:00:00Z'},

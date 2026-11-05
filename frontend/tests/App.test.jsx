@@ -88,6 +88,20 @@ describe('journey dashboard integration', () => {
     expect(planRoute).toHaveBeenCalledTimes(2)
   })
 
+  it('removes duplicate provider routes before rendering cards and map layers', async () => {
+    const recommended = makeRoute('route-1', 'Recommended corridor', {recommended: true})
+    const duplicate = {...makeRoute('route-2', 'Repeated corridor'), geometry: structuredClone(recommended.geometry)}
+    planRoute.mockResolvedValue(makePlan({routes: [recommended, duplicate], recommendedId: 'route-1'}))
+    render(<App/>)
+    fillRequiredFields()
+    submitForm()
+    expect(await screen.findByRole('heading', {name: 'Compare 1 route'})).toBeInTheDocument()
+    expect(screen.getByText('Recommended corridor')).toBeInTheDocument()
+    expect(screen.queryByText('Repeated corridor')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1')
+    expect(screen.getByText(/near-identical route was removed/i)).toBeInTheDocument()
+  })
+
   it('forecast exploration updates timestamp and clearly handles unavailable forecast hours', async () => {
     planRoute.mockResolvedValue(makePlan())
     render(<App/>)

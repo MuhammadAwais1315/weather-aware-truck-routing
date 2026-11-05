@@ -33,6 +33,7 @@ export function buildTripActivityTimeline(route, departureTime) {
       location: point.location_label || null,
       distance: Number(point.distance_from_origin_miles ?? point.distance_miles ?? 0),
       risk: point.risk?.level || 'unknown',
+      riskScore: point.risk?.final_risk_score ?? point.risk?.score ?? null,
       weather: point.weather || null,
       endpoint: isOrigin || isPickup || isDestination,
       pickup: isPickup,
@@ -78,5 +79,53 @@ export function formatTimelineDateTime(timestamp) {
   return Number.isFinite(date.getTime())
     ? date.toLocaleString([], {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})
     : 'Time unavailable'
+}
+
+const RISK_COLORS = {no_travel: '#7f1d1d', severe: '#dc2626', high: '#f97316', moderate: '#d2a000', low: '#22a06b', unknown: '#64748b'}
+
+export function buildRiskTimelineGraph(events, {width = 760, height = 230} = {}) {
+  const left = 54
+  const right = 18
+  const top = 18
+  const bottom = 44
+  const plotWidth = width - left - right
+  const plotHeight = height - top - bottom
+  const times = (events || []).map(event => event.time instanceof Date ? event.time.getTime() : new Date(event.time).getTime()).filter(Number.isFinite)
+  if (!times.length) return {width, height, plot: {left, right, top, bottom, width: plotWidth, height: plotHeight}, points: [], ticks: [], segments: []}
+
+  let startTime = Math.min(...times)
+  let endTime = Math.max(...times)
+  if (endTime === startTime) { startTime -= 30 * 60_000; endTime += 30 * 60_000 }
+  const points = (events || []).flatMap(event => {
+    const time = event.time instanceof Date ? event.time.getTime() : new Date(event.time).getTime()
+    if (!Number.isFinite(time)) return []
+    const scoreValue = event.riskScore ?? event.risk?.final_risk_score ?? event.risk?.score
+    const score = scoreValue == null || !Number.isFinite(Number(scoreValue)) ? null : Math.max(0, Math.min(100, Number(scoreValue)))
+    const level = event.risk || 'unknown'
+    return [{
+      id: event.id,
+      x: left + (time - startTime) / (endTime - startTime) * plotWidth,
+      y: score == null ? null : top + (100 - score) / 100 * plotHeight,
+      score,
+      risk: typeof level === 'string' ? level : level.level || 'unknown',
+      time,
+      color: RISK_COLORS[typeof level === 'string' ? level : level.level] || RISK_COLORS.unknown,
+    }]
+  }).sort((a, b) => a.time - b.time)
+
+  const segments = []
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1]
+    const to = points[index]
+    if (from.y == null || to.y == null) continue
+    segments.push({id: `${from.id}-${to.id}`, x1: from.x, y1: from.y, x2: to.x, y2: to.y})
+  }
+
+  const ticks = Array.from({length: 5}, (_, index) => {
+    const ratio = index / 4
+    const time = startTime + (endTime - startTime) * ratio
+    return {x: left + plotWidth * ratio, time, label: new Date(time).toLocaleString([], {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}
+  })
+  return {width, height, plot: {left, right, top, bottom, width: plotWidth, height: plotHeight}, points, ticks, segments}
 }
 

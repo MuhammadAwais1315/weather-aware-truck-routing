@@ -14,7 +14,8 @@ describe('trip activity timeline UI', () => {
     expect(screen.getAllByText(/Wind 19 mph/).length).toBeGreaterThan(0)
     expect(document.querySelectorAll('.activity-event-time')).toHaveLength(3)
     expect(screen.getByText('3 events')).toBeInTheDocument()
-    expect(document.querySelector('.activity-chart')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', {name: /line graph of weather risk scores/i})).toBeInTheDocument()
+    expect(document.querySelectorAll('.risk-point')).toHaveLength(3)
     expect(screen.getByText(/not a driver duty-status log/)).toBeInTheDocument()
   })
 
@@ -44,5 +45,13 @@ describe('trip activity timeline UI', () => {
   it('explains when the route has no usable checkpoint ETAs', () => {
     render(<TripActivityTimeline route={{checkpoints: []}} departureTime="2026-11-03T14:00:00Z"/>)
     expect(screen.getByText('Checkpoint arrival times are not available for this route.')).toBeInTheDocument()
+  })
+
+  it('shows a clear empty graph message when all checkpoint risks are unknown', () => {
+    const route = makeRoute('route-1', 'Unknown forecast')
+    route.checkpoints = route.checkpoints.map(point => ({...point, risk: {level: 'unknown', score: null, final_risk_score: null}}))
+    render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/>)
+    expect(screen.getByText('Risk scores are unavailable for these forecast checkpoints.')).toBeInTheDocument()
+    expect(document.querySelector('.risk-line')).not.toBeInTheDocument()
   })
 })

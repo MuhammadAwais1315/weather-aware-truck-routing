@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react'
-import {buildTripActivityTimeline, formatTimelineDateTime} from '../activityTimeline.js'
+import {buildRiskTimelineGraph, buildTripActivityTimeline, formatTimelineDateTime} from '../activityTimeline.js'
 
 const weatherSummary = weather => {
   if (!weather || weather.available === false) return 'Forecast unavailable'
@@ -15,6 +15,26 @@ const STOP_META = {
   pickup: {icon: '⬆', title: 'Pickup'},
   dropoff: {icon: '⬇', title: 'Drop-off'},
   weather: {icon: '☁', title: 'Weather checkpoint'},
+}
+const GRAPH_RISK_LABELS = {no_travel: 'No travel', severe: 'Severe', high: 'High', moderate: 'Moderate', low: 'Low'}
+
+function RiskTimelineGraph({events}) {
+  const graph = buildRiskTimelineGraph(events)
+  return <section className="risk-timeline" aria-label="Weather risk over estimated arrival time">
+    <div className="risk-timeline-heading"><div><b>Weather risk over time</b><span>Checkpoint risk score at estimated arrival</span></div><div className="risk-axis-label">Risk score <strong>0–100</strong></div></div>
+    {graph.points.some(point => point.score != null) ? <div className="risk-chart-scroll">
+      <svg className="risk-chart" viewBox={`0 0 ${graph.width} ${graph.height}`} role="img" aria-label="Line graph of weather risk scores by checkpoint arrival time">
+        {[0, 25, 50, 75, 100].map(score => {
+          const y = graph.plot.top + (100 - score) / 100 * graph.plot.height
+          return <g key={score}><line className="risk-gridline" x1={graph.plot.left} x2={graph.width - graph.plot.right} y1={y} y2={y}/><text className="risk-y-tick" x={graph.plot.left - 9} y={y + 4} textAnchor="end">{score}</text></g>
+        })}
+        {graph.ticks.map(tick => <g key={tick.time}><line className="risk-x-tick" x1={tick.x} x2={tick.x} y1={graph.plot.top} y2={graph.height - graph.plot.bottom}/><text className="risk-x-label" x={tick.x} y={graph.height - 12} textAnchor="middle">{tick.label}</text></g>)}
+        {graph.segments.map(segment => <line key={segment.id} className="risk-line" x1={segment.x1} y1={segment.y1} x2={segment.x2} y2={segment.y2}/ >)}
+        {graph.points.map(point => point.score == null ? <g key={point.id} className="risk-unknown-point"><circle cx={point.x} cy={graph.plot.top + graph.plot.height + 8} r="4"/><title>{formatTimelineDateTime(point.time)} · Forecast risk unknown</title></g> : <g key={point.id}><circle className="risk-point" cx={point.x} cy={point.y} r="5" style={{fill: point.color}}><title>{formatTimelineDateTime(point.time)} · {GRAPH_RISK_LABELS[point.risk] || 'Unknown'} risk · {point.score}/100</title></circle><text className="risk-point-value" x={point.x} y={point.y - 10} textAnchor="middle">{point.score}</text></g>)}
+      </svg>
+      <div className="risk-chart-legend"><span><i className="risk-legend-line"/>Checkpoint risk</span><span><i className="risk-legend-unknown"/>Forecast unknown</span></div>
+    </div> : <p className="risk-chart-empty">Risk scores are unavailable for these forecast checkpoints.</p>}
+  </section>
 }
 
 export default function TripActivityTimeline({route, departureTime}) {
@@ -46,6 +66,8 @@ export default function TripActivityTimeline({route, departureTime}) {
           <span className="activity-event-count">{dayEvents.length} events</span>
         </div>
       </div>
+
+      <RiskTimelineGraph events={dayEvents}/>
 
       <ol className="activity-event-list" aria-label="Route itinerary">
         {dayEvents.map(event => {

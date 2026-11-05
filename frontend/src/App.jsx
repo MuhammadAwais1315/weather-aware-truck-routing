@@ -7,6 +7,7 @@ import RouteDirections from './components/RouteDirections.jsx'
 import {planRoute} from './api.js'
 import {buildCheckpointGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
 import {createRequestGate} from './requestGate.js'
+import {deduplicateRoutes} from './routeDiversity.js'
 
 const weatherValue=(value,digits=1)=>value==null?'—':Number(value).toFixed(digits)
 
@@ -32,7 +33,9 @@ export default function App(){
   try{
    const result=await planRoute(payload,request.signal)
    if(!requestGate.current.isCurrent(request))return
-   setPlan(result)
+   const diversity=deduplicateRoutes(result.routes,result.recommended_route_id)
+   const routingNotice=[result.routing_notice,diversity.removed?`${diversity.removed} near-identical route${diversity.removed===1?' was':'s were'} removed; only distinct provider routes are shown.`:''].filter(Boolean).join(' ')
+   setPlan({...result,routes:diversity.routes,routing_notice:routingNotice})
    setSelected(result.recommended_route_id||result.routes?.[0]?.id||null)
   }catch(exception){
    if(!requestGate.current.isCurrent(request))return

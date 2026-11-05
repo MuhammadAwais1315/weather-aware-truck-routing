@@ -35,7 +35,7 @@ describe('journey dashboard integration', () => {
     expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
     expect(screen.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
     fireEvent.click(screen.getByRole('tab', {name: 'Timeline'}))
-    expect(await screen.findByRole('heading', {name: 'Itinerary & stops'})).toBeInTheDocument()
+    expect(await screen.findByRole('heading', {name: 'Trip timeline & stops'})).toBeInTheDocument()
     expect(screen.queryByRole('slider', {name: 'Forecast hour'})).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', {name: 'Map'}))
     expect(screen.getByTestId('map-view')).toBeInTheDocument()
@@ -100,6 +100,21 @@ describe('journey dashboard integration', () => {
     expect(screen.queryByText('Repeated corridor')).not.toBeInTheDocument()
     expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1')
     expect(screen.getByText(/near-identical route was removed/i)).toBeInTheDocument()
+  })
+
+  it('shows three genuinely different provider route geometries when all are returned', async () => {
+    const routes = [1, 2, 3].map(index => makeRoute(`route-${index}`, `Provider corridor ${index}`, {recommended: index === 2, distance: 100 + index}))
+    const plan = makePlan({routes, recommendedId: 'route-2'})
+    planRoute.mockResolvedValue(plan)
+    render(<App/>)
+    fillRequiredFields()
+    submitForm()
+    expect(await screen.findByRole('heading', {name: 'Compare 3 routes'})).toBeInTheDocument()
+    expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-2,route-1,route-3')
+    expect(screen.getByText('Provider corridor 1')).toBeInTheDocument()
+    expect(screen.getByText('Provider corridor 2')).toBeInTheDocument()
+    expect(screen.getByText('Provider corridor 3')).toBeInTheDocument()
+    expect(screen.getByText('BEST OPTION')).toBeInTheDocument()
   })
 
   it('forecast exploration updates timestamp and clearly handles unavailable forecast hours', async () => {

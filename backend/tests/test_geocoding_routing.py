@@ -125,7 +125,14 @@ class OpenRouteServiceClientTests(SimpleTestCase):
         second['geometry']['coordinates'] = [[-78.0, 41.5], [-82.0, 41.7], [-87.6, 41.9]]
         second['properties']['summary'] = {'distance': 900_000, 'duration': 30_000}
         session = Mock()
-        session.post.side_effect = [mocked_response({'features': [first]}), mocked_response({'features': [second]})]
+        session.post.side_effect = [
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+            mocked_response({'features': [first]}), mocked_response({'features': [second]}),
+        ]
         client = OpenRouteServiceClient(api_key='test-key', session=session)
 
         routes = client.get_routes(self.origin, self.destination, via_points=[self.pickup])
@@ -181,12 +188,43 @@ class OpenRouteServiceClientTests(SimpleTestCase):
         # as a separate driver choice.
         second_b = route([[-78.0, 41.5], [-82.0, 41.60004], [-87.6, 41.9]], 805_000, 30_100)
         client = OpenRouteServiceClient(api_key='test-key', session=Mock())
-        with patch.object(client, 'get_routes', side_effect=[[first], [second_a, second_b]]):
+        def mocked_leg_routes(start, end, profile=None, preference=None):
+            if start == self.origin:
+                return [first]
+            return [second_a, second_b]
+
+        with patch.object(client, 'get_routes', side_effect=mocked_leg_routes):
             routes = client._get_pickup_routes(self.origin, self.pickup, self.destination, 'driving-hgv')
 
         self.assertEqual(len(routes), 1)
         self.assertEqual(routes[0]['id'], 'route-1')
         self.assertIn('Near-identical route paths were omitted', routes[0]['alternatives_note'])
+
+    def test_pickup_routes_requests_real_preference_variants_when_provider_returns_too_few_distinct_paths(self):
+        def route(coordinates, duration):
+            distance = 500_000
+            return {
+                'geometry': {'type': 'LineString', 'coordinates': coordinates},
+                'distance_meters': distance, 'duration_seconds': duration,
+                'distance_miles': distance / 1609.344, 'duration_hours': duration / 3600,
+                'summary': {}, 'steps': [],
+            }
+
+        first_fast = route([[-74.0, 40.7], [-76.0, 40.9], [-78.0, 41.5]], 20_000)
+        first_short = route([[-74.0, 40.7], [-75.5, 41.2], [-78.0, 41.5]], 21_000)
+        second_fast = route([[-78.0, 41.5], [-82.0, 41.3], [-87.6, 41.9]], 30_000)
+        second_short = route([[-78.0, 41.5], [-83.0, 42.1], [-87.6, 41.9]], 31_000)
+        client = OpenRouteServiceClient(api_key='test-key', session=Mock())
+
+        with patch.object(client, 'get_routes', side_effect=[
+            [first_fast], [second_fast], [first_short], [second_short],
+        ]) as get_routes:
+            routes = client._get_pickup_routes(self.origin, self.pickup, self.destination, 'driving-hgv')
+
+        self.assertEqual(len(routes), 3)
+        self.assertEqual(len({tuple(map(tuple, route['geometry']['coordinates'])) for route in routes}), 3)
+        self.assertEqual(get_routes.call_args_list[2].kwargs['preference'], 'shortest')
+        self.assertEqual(get_routes.call_args_list[3].kwargs['preference'], 'shortest')
 
     def test_long_trip_alternative_limit_retries_for_one_actual_route(self):
         limit_response = mocked_response({

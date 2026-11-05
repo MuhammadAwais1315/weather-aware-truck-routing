@@ -34,7 +34,9 @@ export default function App(){
    const result=await planRoute(payload,request.signal)
    if(!requestGate.current.isCurrent(request))return
    const diversity=deduplicateRoutes(result.routes,result.recommended_route_id)
-   const routingNotice=[result.routing_notice,diversity.removed?`${diversity.removed} near-identical route${diversity.removed===1?' was':'s were'} removed; only distinct provider routes are shown.`:''].filter(Boolean).join(' ')
+   const diversityNotice=diversity.removed?`${diversity.removed} near-identical route${diversity.removed===1?' was':'s were'} removed; only distinct provider routes are shown.`:''
+   const availabilityNotice=diversity.routes.length<3?`OpenRouteService supplied ${diversity.routes.length} distinct route${diversity.routes.length===1?'':'s'} for this trip after duplicate paths were removed.`:''
+   const routingNotice=[result.routing_notice,diversityNotice,availabilityNotice].filter(Boolean).join(' ')
    setPlan({...result,routes:diversity.routes,routing_notice:routingNotice})
    setSelected(result.recommended_route_id||result.routes?.[0]?.id||null)
   }catch(exception){

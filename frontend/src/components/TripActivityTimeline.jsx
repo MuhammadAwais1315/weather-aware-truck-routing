@@ -24,11 +24,15 @@ function RiskTimelineGraph({events}) {
     <div className="risk-timeline-heading"><div><b>Weather risk over time</b><span>Checkpoint risk score at estimated arrival</span></div><div className="risk-axis-label">Risk score <strong>0–100</strong></div></div>
     {graph.points.some(point => point.score != null) ? <div className="risk-chart-scroll">
       <svg className="risk-chart" viewBox={`0 0 ${graph.width} ${graph.height}`} role="img" aria-label="Line graph of weather risk scores by checkpoint arrival time">
+        {[{from: 75, color: '#dc26260a'}, {from: 50, color: '#f973160a'}, {from: 25, color: '#d2a0000a'}, {from: 0, color: '#22a06b0a'}].map(({from, color}) => {
+          const y = graph.plot.top + (100 - (from + 25)) / 100 * graph.plot.height
+          return <rect key={from} x={graph.plot.left} y={y} width={graph.plot.width} height={graph.plot.height / 4} fill={color}/>
+        })}
         {[0, 25, 50, 75, 100].map(score => {
           const y = graph.plot.top + (100 - score) / 100 * graph.plot.height
           return <g key={score}><line className="risk-gridline" x1={graph.plot.left} x2={graph.width - graph.plot.right} y1={y} y2={y}/><text className="risk-y-tick" x={graph.plot.left - 9} y={y + 4} textAnchor="end">{score}</text></g>
         })}
-        {graph.ticks.map(tick => <g key={tick.time}><line className="risk-x-tick" x1={tick.x} x2={tick.x} y1={graph.plot.top} y2={graph.height - graph.plot.bottom}/><text className="risk-x-label" x={tick.x} y={graph.height - 12} textAnchor="middle">{tick.label}</text></g>)}
+        {graph.ticks.map((tick, index) => <g key={tick.time}><line className="risk-x-tick" x1={tick.x} x2={tick.x} y1={graph.plot.top} y2={graph.height - graph.plot.bottom}/><text className="risk-x-label" x={tick.x} y={graph.height - 12} textAnchor={index===0?'start':index===graph.ticks.length-1?'end':'middle'}>{tick.label}</text></g>)}
         {graph.segments.map(segment => <line key={segment.id} className="risk-line" x1={segment.x1} y1={segment.y1} x2={segment.x2} y2={segment.y2}/ >)}
         {graph.points.map(point => point.score == null ? <g key={point.id} className="risk-unknown-point"><circle cx={point.x} cy={graph.plot.top + graph.plot.height + 8} r="4"/><title>{formatTimelineDateTime(point.time)} · Forecast risk unknown</title></g> : <g key={point.id}><circle className="risk-point" cx={point.x} cy={point.y} r="5" style={{fill: point.color}}><title>{formatTimelineDateTime(point.time)} · {GRAPH_RISK_LABELS[point.risk] || 'Unknown'} risk · {point.score}/100</title></circle><text className="risk-point-value" x={point.x} y={point.y - 10} textAnchor="middle">{point.score}</text></g>)}
       </svg>
@@ -51,9 +55,9 @@ export default function TripActivityTimeline({route, departureTime}) {
     <section className="trip-activity-view" aria-label="Trip activity timeline">
       <div className="activity-heading">
         <div>
-          <span className="section-kicker">TRIP ITINERARY</span>
-          <h3>Itinerary &amp; stops</h3>
-          <p>Arrival times and weather outlook along the selected route.</p>
+          <span className="section-kicker">ESTIMATED JOURNEY</span>
+          <h3>Trip timeline &amp; stops</h3>
+          <p>Follow each stop in order. Times are estimated from the selected route.</p>
         </div>
         <div className="activity-heading-trailing">
           {model.days.length > 1
@@ -66,8 +70,6 @@ export default function TripActivityTimeline({route, departureTime}) {
           <span className="activity-event-count">{dayEvents.length} events</span>
         </div>
       </div>
-
-      <RiskTimelineGraph events={dayEvents}/>
 
       <ol className="activity-event-list" aria-label="Route itinerary">
         {dayEvents.map(event => {
@@ -87,6 +89,7 @@ export default function TripActivityTimeline({route, departureTime}) {
           </li>
         })}
       </ol>
+      <RiskTimelineGraph events={dayEvents}/>
       <p className="activity-disclaimer">Estimated routing and forecast only; this is not a driver duty-status log or Hours of Service compliance calculation.</p>
     </section>
   )

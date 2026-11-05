@@ -52,15 +52,15 @@ def _routes_are_near_duplicates(left, right):
     left_coordinates = left['geometry']['coordinates']
     right_coordinates = right['geometry']['coordinates']
     left_miles, right_miles = left['distance_miles'], right['distance_miles']
-    if max(left_miles, right_miles) <= 0 or abs(left_miles - right_miles) / max(left_miles, right_miles) > 0.015:
+    if max(left_miles, right_miles) <= 0 or abs(left_miles - right_miles) / max(left_miles, right_miles) > 0.03:
         return False
     left_samples, right_samples = _sample_route(left_coordinates), _sample_route(right_coordinates)
     left_distances = sorted(_point_to_route_distance(point, right_coordinates) for point in left_samples)
     right_distances = sorted(_point_to_route_distance(point, left_coordinates) for point in right_samples)
-    # 95% of both paths must lie within 125m. The symmetric check avoids treating
+    # 95% of both paths must lie within 220m. The symmetric check avoids treating
     # a short route that is merely contained in a longer detour as a duplicate.
     percentile = int(math.ceil(0.95 * len(left_samples))) - 1
-    return left_distances[percentile] <= 125 and right_distances[percentile] <= 125
+    return left_distances[percentile] <= 220 and right_distances[percentile] <= 220
 
 
 class OpenRouteServiceClient:
@@ -118,7 +118,7 @@ class OpenRouteServiceClient:
                     suggestions.append({'label': label, 'longitude': longitude, 'latitude': latitude})
         return suggestions
 
-    def get_routes(self, origin, destination, profile=None, via_points=None):
+    def get_routes(self, origin, destination, profile=None, via_points=None, preference=None):
         self._ensure_api_key()
         self._validate_place(origin, 'origin')
         self._validate_place(destination, 'destination')
@@ -138,6 +138,8 @@ class OpenRouteServiceClient:
             'instructions': True,
             'instructions_format': 'text',
         }
+        if preference in {'fastest', 'shortest', 'recommended'}:
+            body['preference'] = preference
         alternatives_limited_note = None
         try:
             response = self.session.post(url, json=body, headers={'Authorization': self.api_key}, timeout=45)
@@ -257,77 +259,114 @@ class OpenRouteServiceClient:
         Request each side of the pickup independently, then combine their actual
         provider geometries. Each combination still visits the required pickup.
         """
-        first_leg_routes = self.get_routes(origin, pickup, profile=profile)
-        second_leg_routes = self.get_routes(pickup, destination, profile=profile)
-        combinations = []
-        seen = set()
-        for first in first_leg_routes:
-            for second in second_leg_routes:
-                first_coords = first['geometry']['coordinates']
-                second_coords = second['geometry']['coordinates']
-                # Both requests share the same pickup coordinate. Avoid duplicating
-                # that vertex in the joined line, even if provider snapping differs
-                # by a few meters between requests.
-                if haversine(first_coords[-1], second_coords[0]) > 0.01:
-                    continue
-                coordinates = first_coords + second_coords[1:]
-                signature = tuple((round(point[0], 5), round(point[1], 5)) for point in coordinates)
-                if signature in seen:
-                    continue
-                seen.add(signature)
-                distance_meters = first['distance_meters'] + second['distance_meters']
-                duration_seconds = first['duration_seconds'] + second['duration_seconds']
-                route = {
-                    'id': f'route-{len(combinations) + 1}',
-                    'name': f'Route {len(combinations) + 1}',
-                    'geometry': {'type': 'LineString', 'coordinates': coordinates},
-                    'distance_meters': distance_meters,
-                    'duration_seconds': duration_seconds,
-                    'distance_miles': round(distance_meters / 1609.344, 1),
-                    'duration_hours': round(duration_seconds / 3600, 2),
-                    'summary': {
+        first_leg_sets = [self.get_routes(origin, pickup, profile=profile)]
+        second_leg_sets = [self.get_routes(pickup, destination, profile=profile)]
+
+        def combine():
+            combinations = []
+            seen = set()
+            first_routes = [route for group in first_leg_sets for route in group]
+            second_routes = [route for group in second_leg_sets for route in group]
+            for first in first_routes:
+                for second in second_routes:
+                    first_coords = first['geometry']['coordinates']
+                    second_coords = second['geometry']['coordinates']
+                    # Both requests share the same pickup coordinate. Avoid duplicating
+                    # that vertex in the joined line, even if provider snapping differs
+                    # by a few meters between requests.
+                    if haversine(first_coords[-1], second_coords[0]) > 0.01:
+                        continue
+                    coordinates = first_coords + second_coords[1:]
+                    signature = tuple((round(point[0], 5), round(point[1], 5)) for point in coordinates)
+                    if signature in seen:
+                        continue
+                    seen.add(signature)
+                    distance_meters = first['distance_meters'] + second['distance_meters']
+                    duration_seconds = first['duration_seconds'] + second['duration_seconds']
+                    route = {
+                        'id': f'route-{len(combinations) + 1}',
+                        'name': f'Route {len(combinations) + 1}',
+                        'geometry': {'type': 'LineString', 'coordinates': coordinates},
                         'distance_meters': distance_meters,
-                        'distance_miles': round(distance_meters / 1609.344, 1),
                         'duration_seconds': duration_seconds,
+                        'distance_miles': round(distance_meters / 1609.344, 1),
                         'duration_hours': round(duration_seconds / 3600, 2),
-                        'profile': profile,
-                    },
-                    'provider_legs': [
-                        {
-                            'distance_meters': first['distance_meters'],
-                            'distance_miles': first['distance_meters'] / 1609.344,
-                            'duration_seconds': first['duration_seconds'],
-                            'waypoint_coordinate': first_coords[-1],
-                            'steps': first.get('steps', []),
+                        'summary': {
+                            'distance_meters': distance_meters,
+                            'distance_miles': round(distance_meters / 1609.344, 1),
+                            'duration_seconds': duration_seconds,
+                            'duration_hours': round(duration_seconds / 3600, 2),
+                            'profile': profile,
                         },
-                        {
-                            'distance_meters': second['distance_meters'],
-                            'distance_miles': second['distance_meters'] / 1609.344,
-                            'duration_seconds': second['duration_seconds'],
-                            'steps': second.get('steps', []),
-                        },
-                    ],
-                    'waypoint_distances_miles': [first['distance_meters'] / 1609.344],
-                }
-                if first.get('segment_durations_seconds') and second.get('segment_durations_seconds'):
-                    route['segment_durations_seconds'] = (
-                        first['segment_durations_seconds'] + second['segment_durations_seconds']
-                    )
-                if first.get('alternatives_note') or second.get('alternatives_note'):
-                    route['alternatives_note'] = (
-                        'OpenRouteService limits alternative-route calculations to legs under 100 km. '
-                        'A leg exceeded that limit and returned one actual route.'
-                    )
-                combinations.append(route)
+                        'provider_legs': [
+                            {
+                                'distance_meters': first['distance_meters'],
+                                'distance_miles': first['distance_meters'] / 1609.344,
+                                'duration_seconds': first['duration_seconds'],
+                                'waypoint_coordinate': first_coords[-1],
+                                'steps': first.get('steps', []),
+                            },
+                            {
+                                'distance_meters': second['distance_meters'],
+                                'distance_miles': second['distance_meters'] / 1609.344,
+                                'duration_seconds': second['duration_seconds'],
+                                'steps': second.get('steps', []),
+                            },
+                        ],
+                        'waypoint_distances_miles': [first['distance_meters'] / 1609.344],
+                    }
+                    if first.get('segment_durations_seconds') and second.get('segment_durations_seconds'):
+                        route['segment_durations_seconds'] = (
+                            first['segment_durations_seconds'] + second['segment_durations_seconds']
+                        )
+                    if first.get('alternatives_note') or second.get('alternatives_note'):
+                        route['alternatives_note'] = (
+                            'OpenRouteService limits alternative-route calculations to legs under 100 km. '
+                            'A leg exceeded that limit and returned one actual route.'
+                        )
+                    combinations.append(route)
+            return combinations
+
+        combinations = combine()
+        # The public ORS alternative algorithm can return fewer than three paths,
+        # or several alternatives that collapse to the same corridor. If that
+        # happens, ask for actual routes with distinct documented preferences.
+        # Never create geometry locally to fill a missing alternative.
+        preferences_used = []
+        if len(self._distinct_routes(combinations)[0]) < 3:
+            for preference in ('shortest', 'recommended'):
+                try:
+                    first_leg_sets.append(self.get_routes(origin, pickup, profile=profile, preference=preference))
+                    second_leg_sets.append(self.get_routes(pickup, destination, profile=profile, preference=preference))
+                    preferences_used.append(preference)
+                except ServiceError:
+                    # The initial pair of real routes is still useful even if an
+                    # optional secondary preference is unavailable from the API.
+                    continue
+                combinations = combine()
+                if len(self._distinct_routes(combinations)[0]) >= 3:
+                    break
 
         if not combinations:
             raise ServiceError(
                 'OpenRouteService could not connect both route legs through the pickup.',
                 status_code=502, code='routing_disconnected_legs',
             )
-        # Keep the three fastest geometrically distinct, fully provider-derived
-        # combinations. ORS can return small geometry variations that otherwise
-        # appear as separate route choices despite following the same corridor.
+        ranked, omitted_near_duplicates = self._distinct_routes(combinations)
+        for index, route in enumerate(ranked, start=1):
+            route['id'] = f'route-{index}'
+            route['name'] = f'Route {index}'
+            if preferences_used:
+                route['summary']['additional_preferences_requested'] = preferences_used
+            if omitted_near_duplicates:
+                note = 'Near-identical route paths were omitted; only distinct provider routes are shown.'
+                route['alternatives_note'] = f"{route['alternatives_note']} {note}" if route.get('alternatives_note') else note
+        return ranked
+
+    @staticmethod
+    def _distinct_routes(combinations):
+        # Keep up to three actual provider routes that differ by meaningful
+        # geometry. Tolerances are aligned with the frontend safety filter.
         ranked = sorted(combinations, key=lambda route: route['duration_seconds'])
         distinct = []
         omitted_near_duplicates = False
@@ -338,14 +377,7 @@ class OpenRouteServiceClient:
             distinct.append(route)
             if len(distinct) == 3:
                 break
-        ranked = distinct
-        for index, route in enumerate(ranked, start=1):
-            route['id'] = f'route-{index}'
-            route['name'] = f'Route {index}'
-            if omitted_near_duplicates:
-                note = 'Near-identical route paths were omitted; only distinct provider routes are shown.'
-                route['alternatives_note'] = f"{route['alternatives_note']} {note}" if route.get('alternatives_note') else note
-        return ranked
+        return distinct, omitted_near_duplicates
 
     @staticmethod
     def _route_steps(properties):

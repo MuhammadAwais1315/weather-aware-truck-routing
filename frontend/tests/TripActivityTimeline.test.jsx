@@ -7,7 +7,7 @@ describe('trip activity timeline UI', () => {
   it('shows the itinerary rail with actual arrival dates, risk and weather values', () => {
     const route = makeRoute('route-1', 'Test route', {risk: 'high'})
     render(<TripActivityTimeline route={route} departureTime="2026-11-03T14:00:00Z"/>)
-    expect(screen.getByRole('heading', {name: 'Itinerary & stops'})).toBeInTheDocument()
+    expect(screen.getByRole('heading', {name: 'Trip timeline & stops'})).toBeInTheDocument()
     expect(screen.getByText('Trip start')).toBeInTheDocument()
     expect(screen.getByText('Drop-off')).toBeInTheDocument()
     expect(screen.getAllByText('High risk').length).toBeGreaterThan(0)

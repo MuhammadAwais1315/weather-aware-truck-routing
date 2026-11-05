@@ -10,6 +10,11 @@ const weatherSummary = weather => {
 }
 
 const riskName = risk => ({no_travel: 'No travel', severe: 'Severe', high: 'High', moderate: 'Moderate', low: 'Low', unknown: 'Unknown'})[risk] || 'Unknown'
+const durationLabel = hours => {
+  if (hours == null || !Number.isFinite(Number(hours))) return 'Duration unavailable'
+  const minutes = Math.round(Number(hours) * 60)
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
 
 export default function TripActivityTimeline({route, departureTime}) {
   const model = useMemo(() => buildTripActivityTimeline(route, departureTime), [route, departureTime])
@@ -30,6 +35,7 @@ export default function TripActivityTimeline({route, departureTime}) {
           <span className="section-kicker">TRIP ACTIVITIES</span>
           <h3>Estimated route timeline</h3>
           <p>Driving periods and weather checkpoints from this route’s estimated arrival times.</p>
+          <div className="activity-summary-pills"><span>{dayEvents.length} stops this day</span>{route?.distance_miles != null&&<span>{Number(route.distance_miles).toFixed(1)} mi total</span>}{route?.duration_hours != null&&<span>{durationLabel(route.duration_hours)} driving</span>}</div>
         </div>
         {model.days.length > 1 && <label className="activity-day-select">Trip day
           <select aria-label="Trip day" value={dayKey} onChange={event => setSelectedDay(event.target.value)}>
@@ -63,9 +69,10 @@ export default function TripActivityTimeline({route, departureTime}) {
 
       <ol className="activity-event-list" aria-label="Route activity events">
         {dayEvents.map(event => <li key={event.id} className="activity-event">
+          <time className="activity-event-time" dateTime={event.time.toISOString()}>{formatTimelineTime(event.time)}</time>
           <span className={`activity-event-dot risk-${event.risk}${event.endpoint ? ' endpoint' : ''}${event.pickup ? ' pickup' : ''}${event.title === 'Arrive' ? ' destination' : ''}`} aria-hidden="true"/>
           <div className="activity-event-main">
-            <div className="activity-event-title"><b>{event.title}</b><span>{formatTimelineTime(event.time)}</span></div>
+            <div className="activity-event-title"><b>{event.title}</b></div>
             <p>{event.distance.toFixed(1)} miles from origin · {weatherSummary(event.weather)}</p>
           </div>
           <span className={`activity-risk risk-${event.risk}`}>{riskName(event.risk)}</span>

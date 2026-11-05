@@ -300,6 +300,8 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
 .activity-heading h3 { margin: 5px 0 5px; color: #243b30; font-size: 19px; }
 .activity-heading p { margin: 0; color: #718078; font-size: 12px; line-height: 1.5; }
+.activity-summary-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.activity-summary-pills span { padding: 6px 9px; border: 1px solid #e5ece7; border-radius: 999px; background: #f8faf8; color: #65786d; font-size: 10px; }
 .activity-day-badge { flex: 0 0 auto; padding: 8px 11px; border: 1px solid #e2eae5; border-radius: 8px; color: #587064; font-size: 11px; }
 .activity-day-select { display: grid; flex: 0 0 auto; gap: 6px; color: #667a70; font-size: 11px; font-weight: 650; }
 .activity-day-select select { min-height: 36px; max-width: 230px; padding: 0 10px; border: 1px solid #dce6e0; border-radius: 7px; background: #fff; color: #31483c; font: inherit; }
@@ -320,15 +322,19 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
 .activity-marker.endpoint.destination { background: #df5946; box-shadow: 0 0 0 2px #fae0dc; }
 .activity-marker.endpoint.pickup { background: #3978c5; box-shadow: 0 0 0 2px #dceafd; }
 .activity-event-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
-.activity-event { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 11px; padding: 12px 3px; border-top: 1px solid #edf1ee; }
-.activity-event-dot { width: 10px; height: 10px; margin: 4px 0 0 2px; border-radius: 50%; background: #95a49b; }
+.activity-event { position: relative; display: grid; grid-template-columns: 70px 20px minmax(0,1fr) auto; align-items: start; gap: 11px; padding: 13px 3px; border-top: 1px solid #edf1ee; }
+.activity-event::before { position: absolute; top: 0; bottom: 0; left: 94px; border-left: 2px solid #e3ebe6; content: ''; }
+.activity-event:first-child::before { top: 50%; }
+.activity-event:last-child::before { bottom: 50%; }
+.activity-event-time { grid-column: 1; padding-top: 1px; color: #62766a; font-size: 11px; font-weight: 650; text-align: right; white-space: nowrap; }
+.activity-event-dot { position: relative; z-index: 1; grid-column: 2; width: 12px; height: 12px; margin: 2px 0 0 4px; border: 2px solid #fff; border-radius: 50%; background: #95a49b; box-shadow: 0 0 0 1px #bdcbc2; }
 .activity-event-dot.endpoint { background: #238e64; box-shadow: 0 0 0 3px #e6f4ec; }
 .activity-event-dot.endpoint.pickup { background: #3978c5; box-shadow: 0 0 0 3px #e2edfc; }
 .activity-event-dot.endpoint.destination { background: #df5946; box-shadow: 0 0 0 3px #fae0dc; }
+.activity-event-main { grid-column: 3; min-width: 0; }
 .activity-event-title { display: flex; align-items: baseline; gap: 10px; color: #31483c; font-size: 12px; }
-.activity-event-title span { color: #76867d; font-size: 11px; }
 .activity-event-main p { margin: 4px 0 0; color: #7c8a82; font-size: 10px; line-height: 1.5; }
-.activity-risk { align-self: center; padding: 4px 8px; border-radius: 999px; background: #eef2ef; color: #6c7c73; font-size: 10px; font-weight: 700; }
+.activity-risk { grid-column: 4; align-self: center; padding: 4px 8px; border-radius: 999px; background: #eef2ef; color: #6c7c73; font-size: 10px; font-weight: 700; }
 .activity-risk.risk-low { background: #e8f5ed; color: #248152; }
 .activity-risk.risk-moderate { background: #fff7d6; color: #98700b; }
 .activity-risk.risk-high { background: #fff0e5; color: #c25a10; }
@@ -353,7 +359,11 @@ footer { min-height: 64px; height: auto; margin-top: 16px; border-top: 1px solid
   .activity-track-row { grid-template-columns: 72px minmax(0,1fr); }
   .activity-track-label { font-size: 10px; }
   .activity-hour-axis span { font-size: 8px; }
-  .activity-event { grid-template-columns: 14px minmax(0,1fr); gap: 8px; }
-  .activity-risk { grid-column: 2; justify-self: start; }
+  .activity-event { grid-template-columns: 58px 18px minmax(0,1fr); gap: 8px; padding: 12px 0; }
+  .activity-event::before { left: 75px; }
+  .activity-event-time { font-size: 10px; }
+  .activity-event-dot { margin-left: 3px; }
+  .activity-event-main { grid-column: 3; }
+  .activity-risk { grid-column: 3; justify-self: start; margin-top: 5px; }
   .activity-event-title { flex-wrap: wrap; gap: 4px 8px; }
 }

@@ -1,4 +1,6 @@
-# React QA test report
+# Historical React QA test report — 2026-11-03
+
+This report records the earlier 40-test frontend run. For the latest results after the selected-hour forecast endpoint and regression fixes, see the repository's [current testing report](../TESTING.md).
 
 **Run date:** 2026-11-03  
 **Command:** `npm run test:all`  

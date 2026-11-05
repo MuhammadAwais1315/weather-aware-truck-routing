@@ -7,44 +7,79 @@ const pageErrors = []
 const consoleErrors = []
 const httpErrors = []
 const failedRequests = []
-let planResponse
 
 page.on('pageerror', error => pageErrors.push(error.message))
 page.on('console', message => {
   if (message.type() === 'error') consoleErrors.push(message.text())
 })
 page.on('response', response => {
-  if (response.url().includes('/api/plan/')) planResponse = response
   if (response.status() >= 400) httpErrors.push({status: response.status(), method: response.request().method(), url: response.url()})
 })
 page.on('requestfailed', request => failedRequests.push({url: request.url(), error: request.failure()?.errorText}))
 
+function localDateTime(value) {
+  const pad = number => String(number).padStart(2, '0')
+  return {
+    date: `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`,
+    time: `${pad(value.getHours())}:${pad(value.getMinutes())}`,
+  }
+}
+
 try {
   await page.goto(baseURL)
-  await page.getByRole('textbox', {name: 'Origin'}).fill('New York, NY')
-  await page.getByRole('textbox', {name: 'Destination'}).fill('Boston, MA')
-  await page.getByLabel('Departure date').fill('2026-11-03')
-  await page.getByLabel('Departure time').fill('18:00')
+  const departure = localDateTime(new Date(Date.now() + 60 * 60 * 1000))
+  await page.getByRole('textbox', {name: 'Truck location'}).fill('New York, NY')
+  await page.getByRole('textbox', {name: 'Pickup location'}).fill('Hartford, CT')
+  await page.getByRole('textbox', {name: 'Final destination'}).fill('Boston, MA')
+  await page.getByLabel('Departure date').fill(departure.date)
+  await page.getByLabel('Departure time').fill(departure.time)
   await page.getByLabel(/Load weight/).fill('42000')
   await page.getByLabel('Checkpoint interval').selectOption('25')
+
+  const planResponsePromise = page.waitForResponse(response => response.url().includes('/api/plan/'), {timeout: 60_000})
   await page.getByRole('button', {name: 'Analyze routes'}).click()
-  await page.waitForResponse(response => response.url().includes('/api/plan/'), {timeout: 60_000})
-  const responseBody = await planResponse.json().catch(() => ({}))
+  const planResponse = await planResponsePromise
+  const planBody = await planResponse.json().catch(() => ({}))
   await page.locator('.route-results,[role="alert"]').first().waitFor({timeout: 10_000})
-  const alert = await page.getByRole('alert').textContent().catch(() => null)
+  const visibleError = await page.getByRole('alert').textContent().catch(() => null)
+
+  let forecastResponse = null
+  let forecastBody = null
+  if (planResponse.status() === 200 && planBody.routes?.length) {
+    await page.getByRole('slider', {name: 'Forecast hour'}).fill('12')
+    forecastResponse = await page.waitForResponse(response => response.url().includes('/api/weather/route-forecast/'), {timeout: 60_000})
+    forecastBody = await forecastResponse.json().catch(() => ({}))
+    await page.locator('.selected-forecast-time span').waitFor({timeout: 10_000})
+  }
+
   const result = {
     frontendUrl: baseURL,
-    planStatus: planResponse.status(),
-    responseBody,
-    visibleError: alert,
+    journey: {
+      httpStatus: planResponse.status(),
+      routeCount: Array.isArray(planBody.routes) ? planBody.routes.length : null,
+      checkpointCounts: Array.isArray(planBody.routes) ? planBody.routes.map(route => route.checkpoints?.length ?? 0) : [],
+      visibleError,
+    },
+    selectedForecast: forecastResponse ? {
+      httpStatus: forecastResponse.status(),
+      requestedCheckpointCount: Array.isArray(forecastBody.forecasts) ? forecastBody.forecasts.length : null,
+      availableCheckpointCount: Array.isArray(forecastBody.forecasts)
+        ? forecastBody.forecasts.filter(item => item.weather?.available === true).length
+        : null,
+      selectedForecastTime: forecastBody.forecast_time || null,
+    } : null,
     pageErrors,
     consoleErrors,
     httpErrors,
     failedRequests,
-    liveRoutesReturned: Array.isArray(responseBody.routes) ? responseBody.routes.length : null,
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
-  if (planResponse.status() !== 200 || !responseBody.routes?.length || pageErrors.length || consoleErrors.length) process.exitCode = 1
+  if (
+    planResponse.status() !== 200 || !planBody.routes?.length
+    || !forecastResponse || forecastResponse.status() !== 200
+    || !Array.isArray(forecastBody.forecasts)
+    || pageErrors.length || consoleErrors.length
+  ) process.exitCode = 1
 } finally {
   await browser.close()
 }

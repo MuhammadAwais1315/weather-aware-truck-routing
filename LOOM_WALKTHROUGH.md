@@ -64,7 +64,7 @@ Explain an example: “For instance, 42,000 pounds combined with wind in the 35-
 
 **Show:** enable the weather heatmap. Move the slider to 0, 12, 24, 36, and 48 hours, pausing to show the selected time and checkpoint display.
 
-**Say:** “The slider explores forecast time from departure through 48 hours. Changing it updates the exploratory checkpoint weather and heatmap; it does not change the weather assessment at the actual ETA stored for the trip. If an hour is unavailable, the map reports missing forecast coverage rather than drawing a zero-risk value.”
+**Say:** “The slider explores forecast time from departure through 48 hours. Changing it requests current forecast data for each route checkpoint and updates the exploratory checkpoint weather and heatmap; it does not change the weather assessment at the actual ETA stored for the trip. If an hour is unavailable, the map reports missing forecast coverage rather than drawing a zero-risk value.”
 
 ### 6:05–6:50 — Loading, failures, repeat plans, and responsive layout
 

@@ -196,6 +196,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .dot { width: 9px; height: 9px; }
 .routing-notice { padding: 10px 16px; font-size: 11px; }
 .map-wrap { height: 500px; }
+.map-loading { min-height: 100%; display: grid; place-items: center; color: #68756f; background: #eef4f1; font-size: 13px; }
 .map-layer-control { min-width: 175px; padding: 13px; border-radius: 11px; font-size: 11px; }
 .map-layer-control label { min-height: 23px; }
 .checkpoint-panel { padding: 20px; }

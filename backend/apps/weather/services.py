@@ -16,6 +16,7 @@ KMH_TO_MPH = 0.621371192237334
 MM_TO_INCHES = 1 / 25.4
 CM_TO_INCHES = 1 / 2.54
 MAX_HOURLY_MATCH_MINUTES = 30
+MAX_LOCATIONS_PER_REQUEST = 100
 
 
 class OpenMeteoWeatherService:
@@ -24,7 +25,7 @@ class OpenMeteoWeatherService:
     HOURLY_VARIABLES = 'wind_speed_10m,wind_gusts_10m,precipitation,rain,snowfall,visibility,weather_code'
 
     def __init__(self, session=None, base_url=OPEN_METEO_URL, cache_ttl_seconds=900,
-                 max_cache_entries=256, clock=time.monotonic):
+                 max_cache_entries=1024, clock=time.monotonic):
         self.session = session or SESSION
         self.base_url = base_url
         self.cache_ttl_seconds = cache_ttl_seconds
@@ -102,6 +103,68 @@ class OpenMeteoWeatherService:
                 self._cache.popitem(last=False)
         return data
 
+    @staticmethod
+    def _coordinate_key(latitude, longitude):
+        return round(float(latitude), 4), round(float(longitude), 4)
+
+    def prefetch_hourly(self, coordinates):
+        """Warm the raw hourly cache with bounded multi-location API requests.
+
+        Open-Meteo accepts comma-separated coordinate lists and returns one hourly
+        payload per location. Fetching in groups avoids one upstream request per
+        checkpoint; callers can then select different ETA/exploration hours locally.
+        """
+        unique = {}
+        for latitude, longitude in coordinates:
+            try:
+                latitude, longitude = float(latitude), float(longitude)
+            except (TypeError, ValueError) as exc:
+                raise ValueError('Checkpoint latitude and longitude must be numeric.') from exc
+            if (not math.isfinite(latitude) or not -90 <= latitude <= 90
+                    or not math.isfinite(longitude) or not -180 <= longitude <= 180):
+                raise ValueError('Checkpoint coordinates are outside valid bounds.')
+            unique.setdefault(self._coordinate_key(latitude, longitude), (latitude, longitude))
+
+        now = self.clock()
+        with self._cache_lock:
+            missing = [item for key, item in unique.items()
+                       if key not in self._cache or now - self._cache[key][0] >= self.cache_ttl_seconds]
+        for offset in range(0, len(missing), MAX_LOCATIONS_PER_REQUEST):
+            batch = missing[offset:offset + MAX_LOCATIONS_PER_REQUEST]
+            params = {
+                'latitude': ','.join(f'{latitude:.6f}' for latitude, _ in batch),
+                'longitude': ','.join(f'{longitude:.6f}' for _, longitude in batch),
+                'hourly': self.HOURLY_VARIABLES,
+                'wind_speed_unit': 'kmh',
+                'precipitation_unit': 'mm',
+                'timezone': 'UTC',
+                'timeformat': 'unixtime',
+                'forecast_days': 7,
+            }
+            try:
+                response = self.session.get(self.base_url, params=params, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+            except requests.Timeout as exc:
+                raise ServiceError('Open-Meteo forecast request timed out.', status_code=504, code='weather_timeout') from exc
+            except requests.HTTPError as exc:
+                raise ServiceError('Open-Meteo returned an HTTP error.', status_code=502, code='weather_provider_error') from exc
+            except (requests.RequestException, ValueError) as exc:
+                raise ServiceError(f'Open-Meteo forecast request failed: {exc}', status_code=502, code='weather_provider_error') from exc
+            if len(batch) == 1 and isinstance(data, dict):
+                responses = [data]
+            elif isinstance(data, list) and len(data) == len(batch) and all(isinstance(item, dict) for item in data):
+                responses = data
+            else:
+                raise ServiceError('Open-Meteo returned an invalid multi-location response.', status_code=502, code='weather_invalid_response')
+            with self._cache_lock:
+                cached_at = self.clock()
+                for (latitude, longitude), payload in zip(batch, responses):
+                    self._cache[self._coordinate_key(latitude, longitude)] = (cached_at, payload)
+                    self._cache.move_to_end(self._coordinate_key(latitude, longitude))
+                while len(self._cache) > self.max_cache_entries:
+                    self._cache.popitem(last=False)
+
     def get_weather(self, latitude, longitude, estimated_arrival):
         arrival_utc = self._to_utc(estimated_arrival)
         try:
@@ -168,6 +231,10 @@ class OpenMeteoWeatherService:
             },
         }
 
+    def get_exploratory_weather(self, latitude, longitude, forecast_time):
+        """Return actual provider weather at a user-selected time, independent of trip ETA."""
+        return self.get_weather(latitude, longitude, forecast_time)
+
     @staticmethod
     def _unavailable(arrival_utc, reason):
         return {
@@ -197,3 +264,11 @@ open_meteo_service = OpenMeteoWeatherService()
 
 def get_weather(lat, lon, arrival):
     return open_meteo_service.get_weather(lat, lon, arrival)
+
+
+def prefetch_weather(coordinates):
+    return open_meteo_service.prefetch_hourly(coordinates)
+
+
+def get_exploratory_weather(lat, lon, forecast_time):
+    return open_meteo_service.get_exploratory_weather(lat, lon, forecast_time)

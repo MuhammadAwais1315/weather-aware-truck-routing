@@ -3,6 +3,7 @@ import {makeCheckpoint, makePlan, makeRoute} from '../tests/fixtures.js'
 
 async function stubProviders(page, plans, {planDelay = 0} = {}) {
   const requests = []
+  const forecastRequests = []
   await page.route('**/api/geocode/autocomplete/**', route => route.fulfill({json: {suggestions: [
     {label: 'New York, NY, USA', longitude: -74, latitude: 40.7},
     {label: 'Newark, NJ, USA', longitude: -74.17, latitude: 40.73},
@@ -15,11 +16,25 @@ async function stubProviders(page, plans, {planDelay = 0} = {}) {
     if (planDelay) await new Promise(resolve => setTimeout(resolve, planDelay))
     await route.fulfill({status: 200, json: plans[planIndex]})
   })
+  await page.route('**/api/weather/route-forecast/', async route => {
+    const request = route.request().postDataJSON()
+    forecastRequests.push(request)
+    const later = new Date(request.forecast_time).getTime() - new Date('2026-11-03T14:00:00Z').getTime() >= 12 * 60 * 60 * 1000
+    const risk = later
+      ? {level: 'severe', risk_label: 'Severe', final_risk_score: 75, score: 75, load_override: {applied: false}, explanation: 'Fixture exploratory severe risk.'}
+      : {level: 'low', risk_label: 'Low', final_risk_score: 0, score: 0, load_override: {applied: false}, explanation: 'Fixture exploratory low risk.'}
+    await route.fulfill({status: 200, json: {forecast_time: request.forecast_time, forecasts: request.checkpoints.map(point => ({
+      ...point,
+      weather: {available: true, forecast_time: request.forecast_time, wind_speed_mph: later ? 46 : 10, rain_inches_per_hour: 0, snowfall_inches_per_hour: 0},
+      risk,
+    }))}})
+  })
   await page.route('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json', route => route.fulfill({
     status: 200,
     headers: {'access-control-allow-origin': '*'},
     json: {version: 8, name: 'Test map', sources: {}, layers: [{id: 'background', type: 'background', paint: {'background-color': '#eef2ef'}}]},
   }))
+  requests.forecastRequests = forecastRequests
   return requests
 }
 
@@ -70,6 +85,9 @@ test('autocomplete, journey API integration, route recommendation, map, and fore
   await expect(page.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
   await page.getByRole('slider', {name: 'Forecast hour'}).fill('12')
   await expect(page.getByText('+12')).toBeVisible()
+  await expect.poll(() => requests.forecastRequests.at(-1)?.forecast_time).toBe('2026-11-04T02:00:00.000Z')
+  expect(requests.forecastRequests.at(-1).checkpoints).toHaveLength(6)
+  await expect.poll(() => page.locator('.selected-forecast-time span').innerText()).toBe('6 of 6 checkpoint forecasts available')
   expect(requests).toHaveLength(1)
   expect(requests[0]).toMatchObject({origin: 'New York, NY, USA', pickup: 'Hartford, CT', destination: 'Boston, MA', load_weight_tons: 21, checkpoint_interval_miles: 25})
   expect(requests[0].departure_time).toMatch(/Z$/)

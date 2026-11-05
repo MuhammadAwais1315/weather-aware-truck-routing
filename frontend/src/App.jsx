@@ -1,15 +1,15 @@
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {lazy, Suspense, useEffect, useMemo, useRef, useState} from 'react'
 import PlannerForm from './components/PlannerForm.jsx'
-import MapView from './components/MapView.jsx'
 import TripActivityTimeline from './components/TripActivityTimeline.jsx'
 import RouteCard from './components/RouteCard.jsx'
 import RouteDirections from './components/RouteDirections.jsx'
-import {planRoute} from './api.js'
-import {buildCheckpointGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
+import {fetchRouteForecast, planRoute} from './api.js'
+import {buildExploratoryForecastGeoJSON, formatForecastTimestamp, getSelectedForecastTimestamp} from './forecast.js'
 import {createRequestGate} from './requestGate.js'
 import {deduplicateRoutes} from './routeDiversity.js'
 
 const weatherValue=(value,digits=1)=>value==null?'—':Number(value).toFixed(digits)
+const MapView=lazy(()=>import('./components/MapView.jsx'))
 
 export default function App(){
  const [plan,setPlan]=useState(null)
@@ -17,15 +17,46 @@ export default function App(){
  const [loading,setLoading]=useState(false)
  const [error,setError]=useState('')
  const [forecastHour,setForecastHour]=useState(0)
+ const [exploratoryForecast,setExploratoryForecast]=useState(null)
+ const [forecastLoading,setForecastLoading]=useState(false)
+ const [forecastError,setForecastError]=useState('')
  const [activityView,setActivityView]=useState('map')
  const requestGate=useRef(null)
+ const forecastRequestSequence=useRef(0)
+ const forecastCache=useRef(new Map())
  if(!requestGate.current)requestGate.current=createRequestGate()
  useEffect(()=>()=>requestGate.current?.cancel(),[])
  const routes=plan?.routes||[]
  const selectedForecastTimestamp=plan?getSelectedForecastTimestamp(plan.departure_time,forecastHour):null
- const selectedForecastGeoJSON=plan?buildCheckpointGeoJSON(routes,plan.departure_time,forecastHour,{selectedRouteId:selected,includeAlternatives:true}):null
+ const selectedForecastGeoJSON=buildExploratoryForecastGeoJSON(exploratoryForecast?.forecasts||[])
  const active=useMemo(()=>routes.find(route=>route.id===selected)||routes.find(route=>route.recommended)||routes[0],[routes,selected])
  const routeSummaries=new Map((plan?.route_summaries||[]).map(summary=>[summary.route_id,summary]))
+
+ useEffect(()=>{
+  if(!plan)return undefined
+  const forecastTime=getSelectedForecastTimestamp(plan.departure_time,forecastHour)
+  if(!forecastTime)return undefined
+  const cached=forecastCache.current.get(forecastTime)
+  if(cached){setExploratoryForecast(cached);setForecastLoading(false);setForecastError('');return undefined}
+  const requestSequence=++forecastRequestSequence.current
+  setExploratoryForecast(null);setForecastLoading(true);setForecastError('')
+  const timer=setTimeout(async()=>{
+   try{
+    const checkpoints=routes.flatMap(route=>(route.checkpoints||[]).map(point=>({
+     route_id:route.id,route_name:route.name||route.id,checkpoint_id:point.id||String(point.index??point.distance_miles),
+     latitude:Number(point.latitude??point.coordinates?.[1]),longitude:Number(point.longitude??point.coordinates?.[0]),
+    })))
+    const result=await fetchRouteForecast({forecast_time:forecastTime,load_weight_tons:plan.load_weight_tons,checkpoints})
+    if(requestSequence!==forecastRequestSequence.current)return
+    forecastCache.current.set(forecastTime,result)
+    while(forecastCache.current.size>8)forecastCache.current.delete(forecastCache.current.keys().next().value)
+    setExploratoryForecast(result)
+   }catch(error){
+    if(requestSequence===forecastRequestSequence.current){setExploratoryForecast(null);setForecastError(error.response?.data?.error||error.message||'Exploratory forecast is unavailable.')}
+  }finally{if(requestSequence===forecastRequestSequence.current)setForecastLoading(false)}
+  },250)
+  return()=>{clearTimeout(timer)}
+ },[plan,forecastHour])
 
  async function submit(payload){
    const request=requestGate.current.start()
@@ -37,6 +68,7 @@ export default function App(){
    const diversityNotice=diversity.removed?`${diversity.removed} near-identical route${diversity.removed===1?' was':'s were'} removed; only distinct provider routes are shown.`:''
    const availabilityNotice=diversity.routes.length<3?`OpenRouteService supplied ${diversity.routes.length} distinct route${diversity.routes.length===1?'':'s'} for this trip after duplicate paths were removed.`:''
    const routingNotice=[result.routing_notice,diversityNotice,availabilityNotice].filter(Boolean).join(' ')
+   forecastCache.current.clear();setExploratoryForecast(null);setForecastError('')
    setPlan({...result,routes:diversity.routes,routing_notice:routingNotice})
    setSelected(result.recommended_route_id||result.routes?.[0]?.id||null)
   }catch(exception){
@@ -78,8 +110,8 @@ export default function App(){
    {routes.length>0&&<section className="analysis-layout">
     <div className="map-panel"><div className="map-toolbar"><div className="map-label"><span className="map-pin">⌖</span><div><b>{active?`${plan.origin.label.split(',')[0]} → ${plan.pickup.label.split(',')[0]} → ${plan.destination.label.split(',')[0]}`:'Route overview'}</b><small>{active?`${active.distance_miles.toLocaleString()} miles · ${active.duration_hours} hours`:'Select a route to inspect its path and activities'}</small></div></div><div className="activity-toolbar-actions"><div className="legend"><span><i className="dot low"/>Low</span><span><i className="dot moderate"/>Moderate</span><span><i className="dot high"/>High</span><span><i className="dot severe"/>Severe</span><span><i className="dot no-travel"/>No travel</span></div><div className="activity-view-switch" role="tablist" aria-label="Trip view"><button type="button" role="tab" aria-selected={activityView==='map'} onClick={()=>setActivityView('map')}>Map</button><button type="button" role="tab" aria-selected={activityView==='timeline'} onClick={()=>setActivityView('timeline')}>Timeline</button></div></div></div>
      {plan.routing_notice&&<div className="routing-notice">ⓘ {plan.routing_notice}</div>}
-     {activityView==='map'?<><div className="map-wrap"><MapView routes={routes} selectedRouteId={active?.id} recommendedRouteId={plan.recommended_route_id} forecastHour={forecastHour} departureTime={plan.departure_time} origin={plan.origin} pickup={plan.pickup} destination={plan.destination}/></div>
-     <div className="forecast-bar"><div className="forecast-title"><span className="forecast-icon">◷</span><div><b>Forecast exploration</b><small>Exploration time is separate from checkpoint ETA</small></div></div><div className="slider-wrap"><input aria-label="Forecast hour" type="range" min="0" max="48" step="1" value={forecastHour} onChange={event=>setForecastHour(Number(event.target.value))}/><div className="slider-ticks"><span>Depart</span><span>12h</span><span>24h</span><span>36h</span><span>48h</span></div><div className="selected-forecast-time"><b>{formatForecastTimestamp(selectedForecastTimestamp)}</b><span>{selectedForecastGeoJSON?.features.length?`${selectedForecastGeoJSON.features.length} checkpoint forecast${selectedForecastGeoJSON.features.length===1?'':'s'} available`:'No checkpoint forecasts available for this time'}</span></div></div><div className="forecast-value">+{forecastHour}<small>hours</small></div></div></>:<TripActivityTimeline route={active} departureTime={plan.departure_time}/>}
+     {activityView==='map'?<><div className="map-wrap"><Suspense fallback={<div className="map-loading" role="status">Loading interactive map…</div>}><MapView routes={routes} selectedRouteId={active?.id} recommendedRouteId={plan.recommended_route_id} exploratoryForecast={exploratoryForecast?.forecasts||[]} origin={plan.origin} pickup={plan.pickup} destination={plan.destination}/></Suspense></div>
+     <div className="forecast-bar"><div className="forecast-title"><span className="forecast-icon">◷</span><div><b>Forecast exploration</b><small>Exploration time is separate from checkpoint ETA</small></div></div><div className="slider-wrap"><input aria-label="Forecast hour" type="range" min="0" max="48" step="1" value={forecastHour} onChange={event=>setForecastHour(Number(event.target.value))}/><div className="slider-ticks"><span>Depart</span><span>12h</span><span>24h</span><span>36h</span><span>48h</span></div><div className="selected-forecast-time"><b>{formatForecastTimestamp(selectedForecastTimestamp)}</b><span>{forecastLoading?'Loading forecast for route checkpoints…':forecastError||`${selectedForecastGeoJSON.features.filter(feature=>feature.properties.weatherAvailable).length} of ${selectedForecastGeoJSON.features.length} checkpoint forecasts available`}</span></div></div><div className="forecast-value">+{forecastHour}<small>hours</small></div></div></>:<TripActivityTimeline route={active} departureTime={plan.departure_time}/>}
     </div>
     <aside className="checkpoint-panel"><div className="checkpoint-panel-heading"><span className="section-kicker">ON THE WAY</span><h3>Checkpoint outlook</h3><p>{active?`${active.checkpoints.length} forecast checkpoints`:'Select a route'}</p></div>{active&&<div className="checkpoint-list dashboard-checkpoints">{active.checkpoints.map(point=><div className="checkpoint weather-checkpoint" key={point.id||point.index}><div className="checkpoint-top"><i className={`dot ${point.risk.level}`}/><span>{point.distance_miles} mi</span><b>{point.risk.score??'—'}</b></div><small>Wind {weatherValue(point.weather?.wind_speed_mph)} mph<br/>Rain {weatherValue(point.weather?.rain_inches_per_hour,3)} in/hr · Snow {weatherValue(point.weather?.snowfall_inches_per_hour,3)} in/hr</small></div>)}</div>}</aside>
    </section>}

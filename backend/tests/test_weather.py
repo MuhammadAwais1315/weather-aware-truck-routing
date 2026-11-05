@@ -199,3 +199,46 @@ class OpenMeteoWeatherServiceTests(SimpleTestCase):
         clock[0] = 11
         service.get_weather(40.7, -74.0, arrival)
         self.assertEqual(session.get.call_count, 2)
+
+    def test_multi_location_prefetch_batches_unique_coordinates_and_warms_hour_cache(self):
+        session = Mock()
+        hourly = self.populated_hourly()
+        response_one = Mock()
+        response_one.raise_for_status.return_value = None
+        response_one.json.return_value = [{'hourly': hourly} for _ in range(100)]
+        response_two = Mock()
+        response_two.raise_for_status.return_value = None
+        response_two.json.return_value = {'hourly': hourly}
+        session.get.side_effect = [response_one, response_two]
+        service = OpenMeteoWeatherService(session=session)
+        coords = [(35 + index / 100, -100 - index / 100) for index in range(101)]
+        coords.append(coords[0])
+
+        service.prefetch_hourly(coords)
+        weather = service.get_weather(*coords[0], datetime(2026, 1, 1, 8, tzinfo=timezone.utc))
+
+        self.assertEqual(session.get.call_count, 2)
+        first_params = session.get.call_args_list[0].kwargs['params']
+        self.assertEqual(len(first_params['latitude'].split(',')), 100)
+        self.assertEqual(len(first_params['longitude'].split(',')), 100)
+        second_params = session.get.call_args_list[1].kwargs['params']
+        self.assertEqual(len(second_params['latitude'].split(',')), 1)
+        self.assertAlmostEqual(weather['wind_speed_mph'], 10.0, places=6)
+
+    def test_multi_location_prefetch_rejects_malformed_batch_response(self):
+        session = Mock()
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = [{'hourly': self.populated_hourly()}]
+        session.get.return_value = response
+        service = OpenMeteoWeatherService(session=session)
+
+        with self.assertRaises(ServiceError) as error:
+            service.prefetch_hourly([(40.7, -74), (41.0, -73)])
+
+        self.assertEqual(error.exception.default_code, 'weather_invalid_response')
+
+    def test_empty_prefetch_does_not_call_provider(self):
+        service, session = self.make_service()
+        service.prefetch_hourly([])
+        session.get.assert_not_called()

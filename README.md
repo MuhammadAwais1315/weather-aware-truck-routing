@@ -168,6 +168,11 @@ Use the examples for each runtime: [`backend/.env.example`](backend/.env.example
 | `APP_VERSION` | Backend | Version string returned by `/api/health/`. |
 | `LOG_LEVEL` | Backend | Python log level, usually `INFO`. |
 | `VITE_API_BASE_URL` | Frontend build | API base URL ending with `/api`; local default is `http://127.0.0.1:8000/api`. |
+| `API_PLAN_RATE` | Backend | DRF scoped limit for route plans; default `20/hour`. |
+| `API_FORECAST_RATE` | Backend | DRF scoped limit for exploratory forecasts; default `120/hour`. |
+| `API_AUTOCOMPLETE_RATE` | Backend | DRF scoped limit for address suggestions; default `120/min`. |
+| `API_GEOCODE_RATE` | Backend | DRF scoped limit for forward/reverse geocoding; default `60/min`. |
+| `REDIS_URL` | Backend | Optional shared Redis cache for cross-worker/serverless DRF throttling; use a managed Redis/Upstash URL in production. |
 
 ## API overview
 
@@ -211,6 +216,22 @@ Geocodes all three locations, requests routes through pickup, then generates che
 `departure_time` must be ISO-8601 with `Z` or a UTC offset. The frontend accepts pounds and converts to short tons for the API (`42,000 lb = 21 tons`). Supported intervals are 10, 25, and 50 miles.
 
 Each route response includes route ID/name, GeoJSON `LineString` geometry, distance, duration, two route legs, ETA checkpoints, risk metrics, and recommendation state. Each checkpoint has coordinates, distance/progress, estimated arrival, nullable weather values, forecast availability, and risk details. Route metrics include severe miles, high miles, average risk, No Travel segments, and forecast coverage. See [`frontend/src/contracts.js`](frontend/src/contracts.js) and [`backend/apps/routing/serializers.py`](backend/apps/routing/serializers.py) for the concrete response contract.
+
+### `POST /api/weather/route-forecast/`
+
+Returns actual weather and load-aware risk for each supplied route checkpoint at one exploratory timestamp. This time is independent of the checkpoint's trip ETA risk. The frontend debounces slider input, submits all available route checkpoints, and updates both the map heatmap and the exploratory checkpoint marker overlay. Missing hours stay unavailable/unknown.
+
+```json
+{
+  "forecast_time": "2026-11-03T16:00:00Z",
+  "load_weight_tons": 21,
+  "checkpoints": [
+    {"route_id":"route-1","route_name":"Route 1","checkpoint_id":"checkpoint-0001","latitude":40.71,"longitude":-74.00}
+  ]
+}
+```
+
+The response contains `forecast_time` and a `forecasts` array with route/checkpoint identifiers, forecast availability, normalized weather values, and risk recalculated using the trip load. Up to 1,000 checkpoints are accepted. Open-Meteo requests are batched by location and cached per coordinate; moving the slider reuses cached hourly data where available.
 
 ## Risk and recommendation rules
 
@@ -270,7 +291,7 @@ The project source is in the private GitHub repository [MuhammadAwais1315/weathe
 
 ### Deployment configuration
 
-For Vercel, configure `VITE_API_BASE_URL` as a Production environment variable on the frontend project, then redeploy because Vite embeds it at build time. Set `OPENROUTESERVICE_API_KEY`, `DJANGO_SECRET_KEY`, `DEBUG=False`, host settings, and exact `CORS_ALLOWED_ORIGINS` on the backend project. Keep secrets server-side. Vercel-specific configuration is in [`frontend/vercel.json`](frontend/vercel.json) and [`backend/vercel.json`](backend/vercel.json). `render.yaml` is an optional Render Blueprint configuration.
+For Vercel, configure `VITE_API_BASE_URL` as a Production environment variable on the frontend project, then redeploy because Vite embeds it at build time. Set `OPENROUTESERVICE_API_KEY`, `DJANGO_SECRET_KEY`, `DEBUG=False`, host settings, and exact `CORS_ALLOWED_ORIGINS` on the backend project. Set `REDIS_URL` to a managed Redis/Upstash URL if DRF throttles must apply across serverless instances; without it the cache and throttle counters are local to each process. Keep secrets server-side. Vercel-specific configuration is in [`frontend/vercel.json`](frontend/vercel.json) and [`backend/vercel.json`](backend/vercel.json). `render.yaml` is an optional Render Blueprint configuration.
 
 Useful live checks:
 
@@ -286,12 +307,12 @@ A health response verifies only API liveness, not the full route/weather workflo
 - ORS may return fewer than three routes; its alternative calculation has distance and provider constraints.
 - HGV routing does not guarantee regulatory vehicle or road restriction compliance.
 - Forecast coverage is finite; unknown values remain unknown. Open-Meteo availability/horizon can change.
-- Checkpoint weather requests and external provider quotas can increase planning latency, especially with 10-mile spacing on long trips.
+- Weather requests are batched in groups of up to 100 locations and cached in process. Long routes can still require several upstream requests; provider quotas and hosting request-duration limits apply.
 - Geocoding and forecast caching is process-local, in-memory, non-persistent, and not shared across workers.
 - The risk engine is a fixed threshold model; it does not model traffic, road surface, closures, vehicle dimensions, or driver-specific guidance.
 - The map uses CARTO Voyager tiles and OpenStreetMap data/attribution; availability and usage are subject to their terms.
-- No accounts, authentication, persistent trip storage, or application-level rate limiting are implemented.
-- The production JavaScript bundle has previously emitted a size advisory; consider lazy-loading MapLibre and splitting bundles if optimizing for scale.
+- No accounts, authentication, or persistent trip storage are implemented. DRF rate limits are scoped but use process-local cache; use shared Redis or edge-level rate limiting if deploying multiple workers or scaling public traffic.
+- MapLibre is lazy-loaded to reduce the initial dashboard download. The map chunk may still be large and should be split further if load-time metrics require it.
 
 ## Demo walkthrough
 

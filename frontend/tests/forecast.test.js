@@ -1,6 +1,7 @@
 import {test, expect} from 'vitest'
 import {
   buildCheckpointGeoJSON,
+  buildExploratoryForecastGeoJSON,
   clampForecastHour,
   getSelectedForecastTimestamp,
   getVisibleForecastCheckpoints,
@@ -73,4 +74,25 @@ test('missing forecast hours and unknown risk are omitted rather than shown as z
   const geojson = buildCheckpointGeoJSON([route], departure, 2)
   expect(geojson.features.some(feature => feature.properties.checkpointId === 'cp-missing')).toBe(false)
   expect(buildCheckpointGeoJSON([route], departure, 24).features).toHaveLength(0)
+})
+
+test('exploratory forecast GeoJSON updates every checkpoint independently of trip ETA risk', () => {
+  const forecasts = [
+    {route_id: 'route-1', checkpoint_id: 'cp-1', longitude: -73.8, latitude: 41.2,
+      weather: {available: true, forecast_time: '2026-11-03T16:00:00Z', wind_speed_mph: 36, rain_inches_per_hour: 0, snowfall_inches_per_hour: 0},
+      risk: {risk_label: 'High', level: 'high', final_risk_score: 50}},
+    {route_id: 'route-1', checkpoint_id: 'cp-2', longitude: -73.5, latitude: 41.5,
+      weather: {available: true, forecast_time: '2026-11-03T16:00:00Z', wind_speed_mph: 58, rain_inches_per_hour: 0, snowfall_inches_per_hour: 0},
+      risk: {risk_label: 'No Travel', level: 'no_travel', final_risk_score: 100, load_override: {applied: true, rule: 'Wind override'}}},
+    {route_id: 'route-2', checkpoint_id: 'cp-3', longitude: -73.2, latitude: 41.8,
+      weather: {available: false, forecast_time: null, wind_speed_mph: null},
+      risk: {risk_label: 'Unknown', level: 'unknown', final_risk_score: null}},
+  ]
+  const geojson = buildExploratoryForecastGeoJSON(forecasts)
+  expect(geojson.features).toHaveLength(3)
+  expect(geojson.features[0].geometry.coordinates).toEqual([-73.8, 41.2])
+  expect(geojson.features.map(feature => feature.properties.riskWeight)).toEqual([0.5, 1, null])
+  expect(geojson.features[1].properties.loadOverrideRule).toBe('Wind override')
+  expect(geojson.features[2].properties.weatherAvailable).toBe(false)
+  expect(buildExploratoryForecastGeoJSON(forecasts, {selectedRouteId: 'route-1', includeAlternatives: false}).features).toHaveLength(2)
 })

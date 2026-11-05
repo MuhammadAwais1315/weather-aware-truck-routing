@@ -83,6 +83,42 @@ export function buildCheckpointGeoJSON(routes, departureTime, hoursOffset, { sel
   return { type: 'FeatureCollection', features }
 }
 
+export function buildExploratoryForecastGeoJSON(forecasts, {selectedRouteId, includeAlternatives = true} = {}) {
+  const features = (forecasts || []).flatMap(forecast => {
+    if (!includeAlternatives && forecast.route_id !== selectedRouteId) return []
+    const coordinates = coordinateOf(forecast)
+    if (!coordinates) return []
+    const risk = forecast.risk || {}
+    const weather = forecast.weather || {}
+    const level = risk.level || risk.risk_label?.toLowerCase().replaceAll(' ', '_') || 'unknown'
+    const weight = riskWeight(risk)
+    return [{
+      type: 'Feature',
+      id: `${forecast.route_id}:${forecast.checkpoint_id}`,
+      geometry: {type: 'Point', coordinates},
+      properties: {
+        routeId: forecast.route_id,
+        checkpointId: forecast.checkpoint_id,
+        routeName: forecast.route_name || forecast.route_id,
+        exploratory: true,
+        weatherAvailable: weather.available === true,
+        forecastTime: weather.forecast_time || null,
+        riskLabel: risk.risk_label || 'Unknown',
+        riskLevel: weight == null ? 'unknown' : level,
+        riskWeight: weight,
+        riskScore: risk.final_risk_score ?? risk.score ?? null,
+        windSpeedMph: weather.wind_speed_mph ?? null,
+        rainInchesPerHour: weather.rain_inches_per_hour ?? null,
+        snowfallInchesPerHour: weather.snowfall_inches_per_hour ?? null,
+        loadOverrideApplied: risk.load_override?.applied === true,
+        loadOverrideRule: risk.load_override?.rule || '',
+        riskExplanation: risk.explanation || 'Forecast risk is unknown.',
+      },
+    }]
+  })
+  return {type: 'FeatureCollection', features}
+}
+
 // Trip checkpoint markers describe the assessment at each checkpoint's actual
 // ETA. Keep them independent from the exploratory slider's heatmap observations
 // so a slider time with no matching hourly forecast cannot hide route stops.

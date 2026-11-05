@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import { buildCheckpointGeoJSON, buildTripCheckpointGeoJSON } from '../forecast.js'
+import { buildExploratoryForecastGeoJSON, buildTripCheckpointGeoJSON } from '../forecast.js'
 
 // Vite must emit MapLibre's module worker as a first-class asset. Without this,
 // its default relative URL points at a dependency file that Vercel does not serve.
 maplibregl.setWorkerUrl(mapLibreWorkerUrl)
 
 const ROUTE_COLORS = ['#258b65', '#3978c5', '#8b5fc7']
-const SOURCE_IDS = ['route-lines', 'weather-checkpoints', 'trip-checkpoints', 'journey-endpoints']
+const SOURCE_IDS = ['route-lines', 'exploratory-forecast', 'trip-checkpoints', 'journey-endpoints']
 
 const safeCoordinate = point => {
   const coordinates = point?.coordinates || [point?.longitude, point?.latitude]
@@ -36,7 +36,7 @@ function addDetailRow(container, label, value) {
   container.append(row)
 }
 
-export default function MapView({ routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, pickup, destination }) {
+export default function MapView({ routes = [], selectedRouteId, recommendedRouteId, exploratoryForecast = [], origin, pickup, destination }) {
   const host = useRef(null)
   const map = useRef(null)
   const popup = useRef(null)
@@ -48,7 +48,7 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
     routes.map(route => [route.id, route.geometry?.coordinates?.[0], route.geometry?.coordinates?.at(-1), route.geometry?.coordinates?.length || 0]),
   ]), [routes, origin, destination])
 
-  const data = useMemo(() => ({ routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, pickup, destination, layers, routeSignature }), [routes, selectedRouteId, recommendedRouteId, forecastHour, departureTime, origin, pickup, destination, layers, routeSignature])
+  const data = useMemo(() => ({ routes, selectedRouteId, recommendedRouteId, exploratoryForecast, origin, pickup, destination, layers, routeSignature }), [routes, selectedRouteId, recommendedRouteId, exploratoryForecast, origin, pickup, destination, layers, routeSignature])
   latest.current = data
 
   const onCheckpointClick = useCallback(event => {
@@ -72,10 +72,23 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
     root.append(heading)
     addDetailRow(root, 'Distance from origin', `${valueOrDash(point.distance_from_origin_miles ?? point.distance_miles)} mi`)
     addDetailRow(root, 'Estimated arrival', displayTime(point.estimated_arrival_time || point.arrival_time))
-    addDetailRow(root, 'Wind speed', `${valueOrDash(point.weather?.wind_speed_mph)} mph`)
-    addDetailRow(root, 'Rain intensity', `${valueOrDash(point.weather?.rain_inches_per_hour, 3)} in/hr`)
-    addDetailRow(root, 'Snowfall intensity', `${valueOrDash(point.weather?.snowfall_inches_per_hour, 3)} in/hr`)
-    const override = point.risk?.load_override
+    const exploratory = props.exploratory === true || props.exploratory === 'true'
+    if (exploratory) {
+      addDetailRow(root, 'Exploratory forecast time', displayTime(props.forecastTime))
+      addDetailRow(root, 'Exploratory risk', `${props.riskLabel || 'Unknown'} · ${valueOrDash(props.riskScore, 0)}/100`)
+      addDetailRow(root, 'Trip ETA risk', `${point.risk?.risk_label || 'Unknown'} · ${valueOrDash(point.risk?.final_risk_score ?? point.risk?.score, 0)}/100`)
+    }
+    const weather = exploratory ? {
+      wind_speed_mph: props.windSpeedMph,
+      rain_inches_per_hour: props.rainInchesPerHour,
+      snowfall_inches_per_hour: props.snowfallInchesPerHour,
+    } : point.weather
+    addDetailRow(root, 'Wind speed', `${valueOrDash(weather?.wind_speed_mph)} mph`)
+    addDetailRow(root, 'Rain intensity', `${valueOrDash(weather?.rain_inches_per_hour, 3)} in/hr`)
+    addDetailRow(root, 'Snowfall intensity', `${valueOrDash(weather?.snowfall_inches_per_hour, 3)} in/hr`)
+    const override = exploratory
+      ? {applied: props.loadOverrideApplied === true || props.loadOverrideApplied === 'true', rule: props.loadOverrideRule}
+      : point.risk?.load_override
     const explanation = document.createElement('p')
     explanation.className = `checkpoint-popup-explanation${override?.applied ? ' is-override' : ''}`
     explanation.textContent = override?.applied
@@ -107,13 +120,17 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
       SOURCE_IDS.forEach(id => instance.addSource(id, { type: 'geojson', data: featureCollection([]), ...(id === 'route-lines' ? { lineMetrics: true } : {}) }))
       instance.addLayer({ id: 'route-casing', type: 'line', source: 'route-lines', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': ['case', ['get', 'recommended'], 11, ['get', 'selected'], 9, 6], 'line-opacity': ['case', ['get', 'visible'], 0.95, 0] } })
       instance.addLayer({ id: 'route-lines', type: 'line', source: 'route-lines', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['get', 'recommended'], 7, ['get', 'selected'], 5, 3], 'line-opacity': ['case', ['get', 'visible'], ['case', ['get', 'recommended'], 1, ['get', 'selected'], 0.95, 0.68], 0] } })
-      instance.addLayer({ id: 'checkpoint-heat', type: 'heatmap', source: 'weather-checkpoints', maxzoom: 10, layout: { visibility: 'none' }, paint: { 'heatmap-weight': ['get', 'riskWeight'], 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 9, 2], 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 10, 9, 28], 'heatmap-opacity': 0.68, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(34,160,107,0)', 0.15, '#eab308', 0.4, '#f97316', 0.7, '#dc2626', 1, '#7f1d1d'] } })
+      instance.addLayer({ id: 'checkpoint-heat', type: 'heatmap', source: 'exploratory-forecast', filter: ['==', ['get', 'weatherAvailable'], true], layout: { visibility: 'none' }, paint: { 'heatmap-weight': ['get', 'riskWeight'], 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 9, 2], 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 10, 9, 28], 'heatmap-opacity': 0.68, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(34,160,107,0)', 0.15, '#eab308', 0.4, '#f97316', 0.7, '#dc2626', 1, '#7f1d1d'] } })
       instance.addLayer({ id: 'checkpoint-dots', type: 'circle', source: 'trip-checkpoints', layout: { visibility: 'visible' }, paint: { 'circle-radius': ['case', ['==', ['get', 'riskLevel'], 'unknown'], 5, 6], 'circle-color': ['match', ['get', 'riskLevel'], 'no_travel', '#7f1d1d', 'severe', '#dc2626', 'high', '#f97316', 'moderate', '#eab308', 'low', '#22a06b', '#64748b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': 0.98 } })
+      instance.addLayer({ id: 'exploratory-checkpoint-dots', type: 'circle', source: 'exploratory-forecast', layout: { visibility: 'visible' }, paint: { 'circle-radius': 9, 'circle-color': ['match', ['get', 'riskLevel'], 'no_travel', '#7f1d1d', 'severe', '#dc2626', 'high', '#f97316', 'moderate', '#eab308', 'low', '#22a06b', '#64748b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5, 'circle-opacity': 0.98 } })
       instance.addLayer({ id: 'endpoint-dots', type: 'circle', source: 'journey-endpoints', paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } })
       instance.addLayer({ id: 'endpoint-labels', type: 'symbol', source: 'journey-endpoints', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-allow-overlap': true }, paint: { 'text-color': '#20312b', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } })
       instance.on('click', 'checkpoint-dots', onCheckpointClick)
+      instance.on('click', 'exploratory-checkpoint-dots', onCheckpointClick)
       instance.on('mouseenter', 'checkpoint-dots', () => { instance.getCanvas().style.cursor = 'pointer' })
+      instance.on('mouseenter', 'exploratory-checkpoint-dots', () => { instance.getCanvas().style.cursor = 'pointer' })
       instance.on('mouseleave', 'checkpoint-dots', () => { instance.getCanvas().style.cursor = '' })
+      instance.on('mouseleave', 'exploratory-checkpoint-dots', () => { instance.getCanvas().style.cursor = '' })
       instance.on('moveend', () => { popup.current?.remove() })
       updateMap(instance, latest.current, true)
       fittedRoutes.current = latest.current?.routeSignature
@@ -148,13 +165,13 @@ export default function MapView({ routes = [], selectedRouteId, recommendedRoute
 
 function updateMap(map, data, shouldFit) {
   if (!map || !data || !SOURCE_IDS.every(id => map.getSource(id))) return
-  const { routes = [], selectedRouteId, recommendedRouteId, forecastHour = 0, departureTime, origin, pickup, destination, layers } = data
+  const { routes = [], selectedRouteId, recommendedRouteId, exploratoryForecast, origin, pickup, destination, layers } = data
   const routeFeatures = routes.filter(route => route.geometry?.type === 'LineString' && route.geometry.coordinates?.length >= 2).map((route, index) => {
     const recommended = route.id === recommendedRouteId || route.recommended === true
     const selected = route.id === selectedRouteId
     return { type: 'Feature', geometry: route.geometry, properties: { id: route.id, name: route.name || `Route ${index + 1}`, color: recommended ? ROUTE_COLORS[0] : ROUTE_COLORS[(index % (ROUTE_COLORS.length - 1)) + 1], selected, recommended, visible: recommended || selected || layers.alternatives } }
   }).sort((left, right) => Number(left.properties.selected || left.properties.recommended) - Number(right.properties.selected || right.properties.recommended))
-  const checkpointData = buildCheckpointGeoJSON(routes, departureTime, forecastHour, {
+  const checkpointData = buildExploratoryForecastGeoJSON(exploratoryForecast, {
     selectedRouteId,
     includeAlternatives: layers.alternatives,
   })
@@ -170,13 +187,15 @@ function updateMap(map, data, shouldFit) {
   }
 
   map.getSource('route-lines').setData(featureCollection(routeFeatures))
-  map.getSource('weather-checkpoints').setData(checkpointData)
+  map.getSource('exploratory-forecast').setData(checkpointData)
   map.getSource('trip-checkpoints').setData(tripCheckpointData)
   map.getSource('journey-endpoints').setData(featureCollection(endpoints))
   for (const id of ['route-lines', 'route-casing', 'checkpoint-dots']) {
     if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible')
   }
-  if (map.getLayer('checkpoint-dots')) map.setLayoutProperty('checkpoint-dots', 'visibility', layers.checkpoints ? 'visible' : 'none')
+  for (const id of ['checkpoint-dots', 'exploratory-checkpoint-dots']) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.checkpoints ? 'visible' : 'none')
+  }
   if (map.getLayer('checkpoint-heat')) map.setLayoutProperty('checkpoint-heat', 'visibility', layers.heatmap ? 'visible' : 'none')
   for (const id of ['endpoint-dots', 'endpoint-labels']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.endpoints ? 'visible' : 'none')
 

@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.routing.serializers import PlanRequestSerializer
+from apps.weather.views import RouteForecastView
 from services.exceptions import ServiceError, api_exception_handler
 from rest_framework.exceptions import ValidationError
 
@@ -158,6 +161,79 @@ class ApiEndpointTests(SimpleTestCase):
             with self.subTest(origin=origin):
                 response = self.client.options('/api/health/', HTTP_ORIGIN=origin, HTTP_ACCESS_CONTROL_REQUEST_METHOD='GET')
                 self.assertEqual(response['Access-Control-Allow-Origin'], origin)
+
+
+class ExploratoryForecastEndpointTests(SimpleTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.weather.views.prefetch_weather')
+    @patch('apps.weather.views.get_exploratory_weather')
+    def test_selected_hour_returns_actual_weather_and_load_aware_risk_for_each_checkpoint(self, get_weather, prefetch):
+        get_weather.side_effect = [
+            {'available': True, 'forecast_time': '2026-11-03T14:00:00+00:00', 'wind_speed_mph': 36,
+             'rain_inches_per_hour': 0.0, 'snowfall_inches_per_hour': 0.0},
+            {'available': True, 'forecast_time': '2026-11-03T14:00:00+00:00', 'wind_speed_mph': 20,
+             'rain_inches_per_hour': 1.2, 'snowfall_inches_per_hour': 0.0},
+        ]
+        response = self.client.post('/api/weather/route-forecast/', {
+            'forecast_time': '2026-11-03T14:00:00Z',
+            'load_weight_tons': 21,
+            'checkpoints': [
+                {'route_id': 'route-1', 'checkpoint_id': 'cp-1', 'latitude': 40.7, 'longitude': -74},
+                {'route_id': 'route-2', 'checkpoint_id': 'cp-2', 'latitude': 41.0, 'longitude': -73},
+            ],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['forecasts']), 2)
+        self.assertEqual(response.json()['forecasts'][0]['risk']['risk_label'], 'Severe')
+        self.assertEqual(response.json()['forecasts'][1]['risk']['risk_label'], 'No Travel')
+        self.assertEqual(get_weather.call_count, 2)
+        prefetch.assert_called_once()
+
+    def test_request_rejects_naive_time_invalid_coordinates_and_too_many_checkpoints(self):
+        base = {
+            'forecast_time': '2026-11-03T14:00:00',
+            'load_weight_tons': 21,
+            'checkpoints': [{'route_id': 'route-1', 'checkpoint_id': 'cp-1', 'latitude': 40, 'longitude': -74}],
+        }
+        response = self.client.post('/api/weather/route-forecast/', base, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('forecast_time', response.json()['details'])
+
+        invalid = {**base, 'forecast_time': '2026-11-03T14:00:00Z',
+                   'checkpoints': [{'route_id': 'route-1', 'checkpoint_id': 'cp-1', 'latitude': 91, 'longitude': -74}]}
+        response = self.client.post('/api/weather/route-forecast/', invalid, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    @patch('apps.weather.views.prefetch_weather')
+    @patch('apps.weather.views.get_exploratory_weather', return_value={
+        'available': True, 'forecast_time': '2026-11-03T14:00:00+00:00', 'wind_speed_mph': 10,
+        'rain_inches_per_hour': 0.0, 'snowfall_inches_per_hour': 0.0,
+    })
+    def test_selected_forecast_endpoint_applies_scoped_rate_limit(self, _get_weather, _prefetch):
+        request_data = {
+            'forecast_time': '2026-11-03T14:00:00Z', 'load_weight_tons': 21,
+            'checkpoints': [{'route_id': 'route-1', 'checkpoint_id': 'cp-1', 'latitude': 40, 'longitude': -74}],
+        }
+        with override_settings(REST_FRAMEWORK={
+            'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
+            'DEFAULT_PARSER_CLASSES': ['rest_framework.parsers.JSONParser'],
+            'EXCEPTION_HANDLER': 'services.exceptions.api_exception_handler',
+            'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.ScopedRateThrottle'],
+            'DEFAULT_THROTTLE_RATES': {'forecast': '1/min', 'plan': '1/min', 'geocode': '1/min', 'autocomplete': '1/min'},
+        }), patch.object(RouteForecastView, 'throttle_classes', [ScopedRateThrottle]), patch.object(
+            ScopedRateThrottle,
+            'THROTTLE_RATES',
+            {'forecast': '1/min', 'plan': '1/min', 'geocode': '1/min', 'autocomplete': '1/min'},
+        ):
+            self.assertEqual(self.client.post('/api/weather/route-forecast/', request_data, format='json').status_code, 200)
+            self.assertEqual(self.client.post('/api/weather/route-forecast/', request_data, format='json').status_code, 429)
 
 
 class CentralExceptionHandlerTests(SimpleTestCase):

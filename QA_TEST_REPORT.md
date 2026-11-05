@@ -36,7 +36,50 @@ After the QA run above, the route card status was clarified so routes with nonze
 
 The original `weather-aware-truck-routing.vercel.app` alias remained assigned to an existing deployment and rejected reassignment. The updated frontend is available at the `-psi` URL above; the API remains at [weather-aware-truck-routing-api-kappa.vercel.app/api/health/](https://weather-aware-truck-routing-api-kappa.vercel.app/api/health/).
 
+### Current quality improvements — 2026-11-05
+
+- Added `POST /api/weather/route-forecast/` so the 0–48-hour slider requests weather for all displayed route checkpoints at the selected timestamp. The exploratory response is held separately from trip ETA weather. The frontend debounces requests, cancels stale requests, caches selected hours in memory, and draws selected-time heatmap/checkpoint layers without changing trip risk results.
+- Batched checkpoint coordinates into Open-Meteo multi-location calls (up to 100 coordinates/request), bounded the in-process weather cache, and added DRF scoped throttles configurable through environment variables.
+- Added API, batching/cache, UI data flow, and all-unsafe recommendation regression coverage. The latest executed Vitest run passed **53/53**, including selected-hour weather populating all route checkpoint statuses and all-unsafe presentation. `python -m compileall` could not execute because this Windows environment has no installed runnable Python interpreter. Therefore the changed Django suite, checks, and coverage have **not** been verified in this run; the earlier 104-test and 85% results are historical.
+- The first Playwright run exposed a map integration defect: `App` passed a GeoJSON object where `MapView` expected the raw forecast array, causing an uncaught `flatMap is not a function` error. The map crashed and the forecast status stayed on “Loading.” The data contract is fixed; the targeted slider workflow passed, then the complete Playwright suite passed **5/5**. The selected-hour checkpoint count now reaches `6 of 6` in the browser test.
+- `npm run build` succeeded. Initial app JS is 324 KB (104 KB gzip); the lazy-loaded MapLibre view is 1,090 KB (299 KB gzip) and still triggers Vite's >500 KB advisory. Map code is deferred until needed, but further chunk analysis can improve map-first loading.
+- These changes have not been redeployed or live-verified. The public deployment URLs above refer to the previously verified build and do not yet prove the new selected-hour API is available in production.
+
 ## Scenario results
+
+## Assessment requirements audit — 2026-11-05
+
+| Assessment requirement | QA result | Evidence / remaining qualification |
+|---|---|---|
+| Origin, departure date/time, load weight; three routing locations in current product | **Implemented** | Current product extends the PDF's origin/destination form with truck location → pickup → destination; frontend tests cover the request payload and unit conversion. |
+| Three provider route options; real alternatives only | **Implemented with provider limitation** | ORS is asked for real alternatives for both pickup legs and real leg alternatives are combined. Long legs can return one actual path; routes are deliberately not fabricated. Live three-route behavior was not re-run during this audit. |
+| 10/25/50-mile checkpoints, coordinates, distance, progress, ETA | **Implemented; backend suite passes** | Current 121-test run covers cumulative route geometry, interpolation, provider segment durations, endpoints, and ETAs. |
+| ETA-specific hourly wind/rain/snow and conversions | **Implemented; backend suite passes** | Current suite covers UTC matching, unit conversions, nulls, missing hours, batching, caching, and API failures. |
+| Weather thresholds and load rules | **Implemented; backend suite passes** | Boundary tests cover all bands and load cutoffs. |
+| Severe/high miles and exact recommendation priority; unsafe handling | **Implemented; backend suite passes** | Segment-distance aggregation, ranking priorities, incomplete forecasts, and all-unsafe routes are covered. |
+| Map, routes, checkpoints, ETA/risk popups, route summary | **Implemented; browser suite passes** | Current Playwright map and timeline workflows passed using deterministic mocked API responses. They do not establish current live provider behavior. |
+| Weather heatmap and 0–48-hour slider | **Implemented; browser suite passes against mocked forecast API** | Browser test confirms selected hour calls all displayed checkpoints and updates the visible availability count; current public API deployment has not been checked for this new endpoint. |
+| README, screenshots, architecture, limitations, testing guide, walkthrough script | **Implemented** | Screenshots and demo script are present. The PDF specifically asks for a 5–10 minute Loom walkthrough: an actual recorded Loom video is not present in the repository. |
+| GitHub and hosted application | **Previously published; current revision not verified/published** | This audit only checked the local checkout. Current changes are not confirmed pushed or deployed. |
+
+### Findings requiring attention
+
+1. **High — Current production deployment is not verified.** The public Vercel build may not yet contain the selected-hour forecast endpoint and latest frontend integration. Deploy the current tested revision and recheck live planning plus `/api/weather/route-forecast/` before claiming the full public workflow passes.
+2. **Medium — Shared rate limits need a Redis service URL.** Code now supports `REDIS_URL`; without a provisioned value, the application uses local memory and counters are per process. Add a managed Redis/Upstash connection in the deployment environment if global throttling is a requirement.
+3. **Assessment deliverable — The Loom video is not recorded.** The 7–9 minute script exists, but the PDF asks for a recorded 5–10 minute walkthrough.
+4. **Low — The MapLibre chunk remains large.** Build passes, and the map bundle is lazy-loaded, but the map chunk is 1,090 KB (299 KB gzip) and Vite emits the 500 KB advisory.
+
+### Latest local execution
+
+`npm run test:all`: Vitest **53 passed, 0 failed**; Playwright **5 passed, 0 failed**. `npm run build`: passed with the MapLibre chunk advisory above. `python manage.py check`: passed. Django suite: **121 passed, 0 failed**. Coverage.py: **83.0%** line/branch coverage. Live providers and public deployment: **not tested in this audit**. Frontend source coverage: **not measured**.
+
+### Remediation and backend verification — 2026-11-05
+
+- Changed Django's default to `DEBUG=False`; the local environment example opts into `DEBUG=True`. Django still requires an explicit signing secret whenever debug is off.
+- Added configurable Django Redis cache support via `REDIS_URL` and added the Redis client dependency. This shares throttle counters when configured; the current deployment still needs an actual Redis URL to enforce aggregate limits.
+- Reworked the live smoke script for the current truck/pickup/destination fields, a near-future departure time, and selected-hour forecast request. Node syntax validation passed. It has not yet been exercised against live APIs.
+- The first current backend run found three stale tests: expected route-provider request count ignored preference retries, expected the old 40-location batch size, and the throttle test changed DRF settings without updating the cached class attribute. The tests now model the implementation correctly. Full `manage.py check` and all **121 backend tests pass**.
+- Current coverage is **83.0%** across 1,266 statements and 424 branches. The frontend suites also pass (**53 Vitest + 5 Playwright**).
 
 | Scenario | Expected | Actual | Pass/Fail |
 |---|---|---|---|

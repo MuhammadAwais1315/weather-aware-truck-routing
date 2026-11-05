@@ -2,16 +2,16 @@
 
 ## Recorded executed results
 
-The QA report contains a complete run recorded on 2026-11-03. The later frontend risk-label change was verified on 2026-11-05; suite counts are listed separately by run so different executions are not combined into a misleading single total. Provider calls in automated tests are mocked; live provider and deployment checks are described in [QA_TEST_REPORT.md](QA_TEST_REPORT.md).
+The QA report includes historical live checks and the latest local run. Current suite counts below were executed on 2026-11-05. Provider calls in automated tests are mocked; the live smoke script exercises real providers when configured. See [QA_TEST_REPORT.md](QA_TEST_REPORT.md) for verified versus historical results.
 
 | Suite | Tests | Passed | Failed | Skipped | Coverage |
 |---|---:|---:|---:|---:|---|
-| Django backend (2026-11-03; see QA report) | 104 | 104 | 0 | 0 | Latest recorded backend run; coverage was not recalculated after regression tests |
-| Vitest + React Testing Library (2026-11-05) | 48 | 48 | 0 | 0 | Not instrumented; no frontend coverage provider configured |
-| Playwright browser (2026-11-05) | 5 | 5 | 0 | 0 | Browser behavior tests, not source coverage |
-| Backend coverage run (2026-11-03, 101-test run) | — | — | — | — | **85.0%** Coverage.py total; line and branch measurement (856 statements, 274 branches) |
+| Django backend (2026-11-05) | 121 | 121 | 0 | 0 | Current run; Django system check clean |
+| Vitest + React Testing Library (2026-11-05) | 53 | 53 | 0 | 0 | Not instrumented; no frontend coverage provider configured |
+| Playwright browser (2026-11-05) | 5 | 5 | 0 | 0 | Selected-hour forecast request/map update and responsive viewports pass |
+| Backend coverage (2026-11-05) | — | — | — | — | **83.0%** Coverage.py total; line and branch measurement (1,266 statements, 424 branches) |
 
-The suites cover geocoding/routing provider behavior, route counts, checkpoint geometry and ETA, hourly weather matching/conversions, risk thresholds/load overrides, distance-weighted recommendations, API validation/errors, form/API integration, map/popups, forecast slider, repeat submission and mobile/tablet/desktop widths. They are not a substitute for live route testing; a valid ORS key is required for that. For deployment and live smoke outcomes, use the dated scenario report.
+The suites cover geocoding/routing provider behavior, route counts, checkpoint geometry and ETA, hourly weather matching/conversions, risk thresholds/load overrides, distance-weighted recommendations, API validation/errors, form/API integration, map/popups, forecast slider, repeat submission and mobile/tablet/desktop widths. The selected-hour browser workflow and 5-test browser suite pass after fixing a map forecast data-shape error. Provider tests use mocks; the live script requires configured API credentials and running services. For deployment and live smoke outcomes, use the dated scenario report.
 
 ## Windows PowerShell commands
 
@@ -50,10 +50,10 @@ cd frontend
 npm run qa:live
 ```
 
-The live smoke performs a real UI submission and reports HTTP, request, console and page errors. It returns a nonzero exit code if planning fails; do not relabel a missing credential or provider failure as a passed full workflow.
+The live smoke submits truck, pickup, and destination locations, checks the planning response, moves the forecast slider, and reports selected-hour forecast availability plus HTTP, request, console, and page errors. It returns a nonzero exit code if planning or the selected-hour forecast endpoint fails; do not relabel missing credentials or provider errors as a passed workflow.
 
 ## Coverage interpretation and follow-up
 
-The backend's latest Coverage.py aggregate is 85.0% with branch measurement enabled. The lowest-coverage modules in that run were shared HTTP handling (50.0%), recommendations (80.0%), weather (80.8%) and route-provider integration (80.6%). Add targeted cases for currently uncovered provider error parsing and unusual checkpoint geometry/validation branches if increasing coverage is a submission goal.
+The latest backend Coverage.py aggregate is 83.0% with branch measurement enabled. Lowest-coverage modules are shared HTTP handling (50.0%), recommendations (77.3%), route-provider integration (77.3%) and weather (79.8%). Add targeted cases for currently uncovered provider error parsing and unusual checkpoint geometry/validation branches if increasing coverage is a submission goal.
 
 The React suite reports test counts only. To report frontend line/branch coverage, add a Vitest-compatible coverage provider (such as the V8 provider), configure include/exclude paths in `vitest.config.js`, run it, and record the resulting report. Do not infer a coverage percentage from the number of passing tests.

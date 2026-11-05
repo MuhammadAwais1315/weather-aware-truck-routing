@@ -66,12 +66,14 @@ class PlanPipelineTests(SimpleTestCase):
         }
         with patch('apps.routing.planning.geocode_place', side_effect=[origin, pickup, destination]) as geocode, \
                 patch('apps.routing.planning.openrouteservice_client.get_routes', return_value=routes) as route_call, \
+                patch('apps.routing.planning.prefetch_weather') as prefetch, \
                 patch('apps.routing.planning.get_weather', side_effect=weather_for) as weather_call:
             plan = build_plan(payload)
 
         self.assertEqual(geocode.call_count, 3)
         route_call.assert_called_once_with(origin, destination, via_points=[pickup])
         self.assertEqual(weather_call.call_count, 8)  # Four checkpoints per route, including the pickup.
+        self.assertEqual(len(list(prefetch.call_args.args[0])), 8)
         self.assertEqual(len(plan['routes']), 2)
         self.assertEqual([len(route['checkpoints']) for route in plan['routes']], [4, 4])
         self.assertEqual(plan['recommended_route_id'], 'route-1')
@@ -118,6 +120,7 @@ class PlanPipelineTests(SimpleTestCase):
             {'label': 'P', 'latitude': 40.5, 'longitude': -74.5},
             {'label': 'B', 'latitude': 41, 'longitude': -74},
         ]), patch('apps.routing.planning.openrouteservice_client.get_routes', return_value=[route]), \
+                patch('apps.routing.planning.prefetch_weather'), \
                 patch('apps.routing.planning.get_weather', return_value={
                     'available': True, 'wind_speed_mph': 10,
                     'rain_inches_per_hour': 0, 'snowfall_inches_per_hour': 0,

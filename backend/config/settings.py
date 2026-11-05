@@ -8,7 +8,7 @@ load_dotenv(BASE_DIR / '.env')
 load_dotenv(BASE_DIR.parent / '.env')
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'unsafe-local-development-key')
-DEBUG = os.getenv('DEBUG', 'True').strip().lower() in {'1', 'true', 'yes', 'on'}
+DEBUG = os.getenv('DEBUG', 'False').strip().lower() in {'1', 'true', 'yes', 'on'}
 if not DEBUG and (not os.getenv('DJANGO_SECRET_KEY') or SECRET_KEY == 'unsafe-local-development-key'):
     from django.core.exceptions import ImproperlyConfigured
     raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is false.')
@@ -36,7 +36,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 ROOT_URLCONF = 'config.urls'
 TEMPLATES = []
@@ -75,7 +77,32 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
     'DEFAULT_PARSER_CLASSES': ['rest_framework.parsers.JSONParser'],
     'EXCEPTION_HANDLER': 'services.exceptions.api_exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.ScopedRateThrottle'],
+    'DEFAULT_THROTTLE_RATES': {
+        'autocomplete': os.getenv('API_AUTOCOMPLETE_RATE', '120/min'),
+        'geocode': os.getenv('API_GEOCODE_RATE', '60/min'),
+        'plan': os.getenv('API_PLAN_RATE', '20/hour'),
+        'forecast': os.getenv('API_FORECAST_RATE', '120/hour'),
+    },
 }
+
+# Django's default cache is process-local, which makes DRF throttles ineffective
+# across serverless instances. Set REDIS_URL in production for a shared cache.
+REDIS_URL = os.getenv('REDIS_URL', '').strip()
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'weatherroute-local',
+        },
+    }
 
 LOGGING = {
     'version': 1,

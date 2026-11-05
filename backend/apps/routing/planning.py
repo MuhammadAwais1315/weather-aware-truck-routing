@@ -4,7 +4,7 @@ from apps.checkpoints.services import MILES_PER_METER, generate_checkpoints
 from apps.geocoding.services import geocode_place
 from apps.recommendations.services import recommend_route
 from apps.risk_engine.services import score_checkpoint
-from apps.weather.services import get_weather
+from apps.weather.services import get_weather, prefetch_weather
 from services.exceptions import ServiceError
 from services.route_provider import openrouteservice_client
 
@@ -26,6 +26,8 @@ def build_plan(payload):
     departure = payload['departure_time']
     interval = int(payload['checkpoint_interval_miles'])
     load = payload['load_weight_tons']
+    prepared_routes = []
+    weather_coordinates = []
     for route in routes:
         miles = route['distance_meters'] * MILES_PER_METER
         waypoint_distances = route.get('waypoint_distances_miles', [])
@@ -35,6 +37,14 @@ def build_plan(payload):
             segment_durations_seconds=route.get('segment_durations_seconds'),
             additional_checkpoint_distances_miles=waypoint_distances,
         )
+        prepared_routes.append((route, miles, waypoint_distances, points))
+        weather_coordinates.extend((point['latitude'], point['longitude']) for point in points)
+
+    # One Open-Meteo multi-location request can cover many checkpoints. Warm the
+    # per-coordinate hourly cache before scoring each point at its own ETA.
+    prefetch_weather(weather_coordinates)
+
+    for route, miles, waypoint_distances, points in prepared_routes:
         locations = [origin, pickup, destination]
         provider_legs = route.get('provider_legs', [])
         legs = []

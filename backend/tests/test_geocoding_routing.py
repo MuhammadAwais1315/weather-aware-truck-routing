@@ -156,7 +156,11 @@ class OpenRouteServiceClientTests(SimpleTestCase):
 
         routes = client.get_routes(self.origin, self.destination, via_points=[self.pickup])
 
-        first_request, second_request = [call.kwargs['json'] for call in session.post.call_args_list]
+        requests = [call.kwargs['json'] for call in session.post.call_args_list]
+        # Retry with documented preferences when the initial responses do not
+        # yield three distinct pickup-complete paths.
+        self.assertEqual(len(requests), 6)
+        first_request, second_request = requests[:2]
         self.assertEqual(first_request['coordinates'], [[-74.0, 40.7], [-78.0, 41.5]])
         self.assertEqual(second_request['coordinates'], [[-78.0, 41.5], [-87.6, 41.9]])
         self.assertEqual(len(routes[0]['provider_legs']), 2)

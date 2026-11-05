@@ -11,12 +11,15 @@ from .serializers import PlanRequestSerializer
 class HealthView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = []
 
     def get(self, request):
         return Response({'status': 'ok', 'version': settings.APP_VERSION})
 
 
 class GeocodeView(APIView):
+    throttle_scope = 'geocode'
+
     def get(self, request):
         query = request.query_params.get('q', '').strip()
         if len(query) < 3:
@@ -25,6 +28,8 @@ class GeocodeView(APIView):
 
 
 class ReverseGeocodeView(APIView):
+    throttle_scope = 'geocode'
+
     def get(self, request):
         latitude = request.query_params.get('lat')
         longitude = request.query_params.get('lon')
@@ -34,6 +39,8 @@ class ReverseGeocodeView(APIView):
 
 
 class AddressAutocompleteView(APIView):
+    throttle_scope = 'autocomplete'
+
     def get(self, request):
         query = request.query_params.get('q', '').strip()
         if len(query) < 3:
@@ -42,6 +49,8 @@ class AddressAutocompleteView(APIView):
 
 
 class PlanRouteView(APIView):
+    throttle_scope = 'plan'
+
     def post(self, request):
         serializer = PlanRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

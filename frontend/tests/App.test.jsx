@@ -1,10 +1,10 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react'
 import {beforeEach, describe, expect, it, vi} from 'vitest'
 import App from '../src/App.jsx'
-import {autocompletePlaces, planRoute} from '../src/api.js'
+import {autocompletePlaces, fetchRouteForecast, planRoute} from '../src/api.js'
 import {makePlan, makeRoute} from './fixtures.js'
 
-vi.mock('../src/api.js', () => ({planRoute: vi.fn(), autocompletePlaces: vi.fn()}))
+vi.mock('../src/api.js', () => ({planRoute: vi.fn(), fetchRouteForecast: vi.fn(), autocompletePlaces: vi.fn()}))
 vi.mock('../src/components/MapView.jsx', () => import('./mocks/MapView.jsx'))
 
 function fillRequiredFields(origin = 'New York, NY', pickup = 'Hartford, CT', destination = 'Boston, MA') {
@@ -19,6 +19,7 @@ function submitForm() { fireEvent.submit(document.querySelector('form')) }
 describe('journey dashboard integration', () => {
   beforeEach(() => {
     planRoute.mockReset()
+    fetchRouteForecast.mockReset().mockResolvedValue({forecasts: []})
     autocompletePlaces.mockReset().mockResolvedValue([])
   })
 
@@ -32,7 +33,7 @@ describe('journey dashboard integration', () => {
     expect(await screen.findByRole('heading', {name: 'Compare 2 routes'})).toBeInTheDocument()
     expect(screen.getByText('BEST OPTION')).toBeInTheDocument()
     expect(screen.getByText('Recommended route')).toBeInTheDocument()
-    expect(screen.getByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
+    expect(await screen.findByTestId('map-view')).toHaveAttribute('data-routes', 'route-1,route-2')
     expect(screen.getByRole('slider', {name: 'Forecast hour'})).toHaveAttribute('max', '48')
     fireEvent.click(screen.getByRole('tab', {name: 'Timeline'}))
     expect(await screen.findByRole('heading', {name: 'Trip timeline & stops'})).toBeInTheDocument()
@@ -117,6 +118,35 @@ describe('journey dashboard integration', () => {
     expect(screen.getByText('BEST OPTION')).toBeInTheDocument()
   })
 
+  it('clearly marks every route unsafe when none has a safe recommendation', async () => {
+    const routes = [1, 2].map(index => {
+      const route = makeRoute(`route-${index}`, `Unsafe corridor ${index}`)
+      route.recommended = false
+      route.metrics = {...route.metrics, no_travel_segments: 1, average_risk: 100}
+      return route
+    })
+    const plan = makePlan({routes, recommendedId: null})
+    plan.recommendation_status = 'all_unsafe'
+    plan.ranking_explanation = 'No safe route available: every route contains a No Travel segment.'
+    plan.route_summaries = routes.map(route => ({
+      route_id: route.id,
+      safety_status: 'unsafe',
+      no_travel_segment_count: 1,
+      severe_miles: 0,
+      high_miles: 0,
+      average_risk: 100,
+    }))
+    planRoute.mockResolvedValue(plan)
+    render(<App/>)
+    fillRequiredFields()
+    submitForm()
+
+    expect(await screen.findByRole('heading', {name: 'Compare 2 routes'})).toBeInTheDocument()
+    expect(screen.getByText('No safe route available')).toBeInTheDocument()
+    expect(screen.getAllByText('NO TRAVEL')).toHaveLength(2)
+    expect(screen.queryByText('BEST OPTION')).not.toBeInTheDocument()
+  })
+
   it('forecast exploration updates timestamp and clearly handles unavailable forecast hours', async () => {
     planRoute.mockResolvedValue(makePlan())
     render(<App/>)
@@ -126,7 +156,31 @@ describe('journey dashboard integration', () => {
     const slider = screen.getByRole('slider', {name: 'Forecast hour'})
     fireEvent.change(slider, {target: {value: '12'}})
     expect(screen.getByText('+12')).toBeInTheDocument()
-    expect(screen.getByText('No checkpoint forecasts available for this time')).toBeInTheDocument()
-    expect(screen.getByTestId('map-view')).toHaveAttribute('data-forecast-hour', '12')
+    await waitFor(()=>expect(fetchRouteForecast).toHaveBeenCalled())
+    expect(await screen.findByText('0 of 0 checkpoint forecasts available')).toBeInTheDocument()
+    expect(fetchRouteForecast).toHaveBeenLastCalledWith(expect.objectContaining({
+      forecast_time:'2026-11-04T02:00:00.000Z',
+      checkpoints:expect.arrayContaining([expect.objectContaining({route_id:'route-1',checkpoint_id:'route-1-cp-1',latitude:40.7,longitude:-74})]),
+    }))
+    expect(fetchRouteForecast.mock.calls.at(-1)[0].checkpoints).toHaveLength(6)
+    expect(planRoute).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders available selected-hour weather for every route checkpoint', async () => {
+    planRoute.mockResolvedValue(makePlan())
+    fetchRouteForecast.mockImplementation(async ({checkpoints, forecast_time}) => ({
+      forecast_time,
+      forecasts: checkpoints.map(point => ({
+        ...point,
+        weather: {available: true, forecast_time, wind_speed_mph: 12, rain_inches_per_hour: 0, snowfall_inches_per_hour: 0},
+        risk: {level: 'low', risk_label: 'Low', final_risk_score: 0, score: 0, load_override: {applied: false}},
+      })),
+    }))
+    render(<App/>)
+    fillRequiredFields()
+    submitForm()
+
+    expect(await screen.findByRole('heading', {name: 'Compare 2 routes'})).toBeInTheDocument()
+    expect(await screen.findByText('6 of 6 checkpoint forecasts available')).toBeInTheDocument()
   })
 })

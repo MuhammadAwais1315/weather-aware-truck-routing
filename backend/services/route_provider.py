@@ -70,6 +70,10 @@ class OpenRouteServiceClient:
         for index, place in enumerate(via_points, start=1):
             self._validate_place(place, f'waypoint {index}')
         profile = profile or os.getenv('OPENROUTESERVICE_PROFILE', 'driving-hgv').strip()
+        if via_points:
+            if len(via_points) != 1:
+                raise ServiceError('Only one required pickup waypoint is supported.', status_code=400, code='invalid_waypoints')
+            return self._get_pickup_routes(origin, via_points[0], destination, profile)
         url = f'{self.base_url}/v2/directions/{profile}/geojson'
         places = [origin, *via_points, destination]
         body = {
@@ -187,6 +191,84 @@ class OpenRouteServiceClient:
             raise ServiceError('OpenRouteService returned an invalid route summary.') from exc
         # Return precisely what the provider returned; never synthesize missing alternatives.
         return routes
+
+    def _get_pickup_routes(self, origin, pickup, destination, profile):
+        """Build complete itineraries from actual alternatives for each ORS leg.
+
+        ORS cannot return alternatives for a request with more than two waypoints.
+        Request each side of the pickup independently, then combine their actual
+        provider geometries. Each combination still visits the required pickup.
+        """
+        first_leg_routes = self.get_routes(origin, pickup, profile=profile)
+        second_leg_routes = self.get_routes(pickup, destination, profile=profile)
+        combinations = []
+        seen = set()
+        for first in first_leg_routes:
+            for second in second_leg_routes:
+                first_coords = first['geometry']['coordinates']
+                second_coords = second['geometry']['coordinates']
+                # Both requests share the same pickup coordinate. Avoid duplicating
+                # that vertex in the joined line, even if provider snapping differs
+                # by a few meters between requests.
+                if haversine(first_coords[-1], second_coords[0]) > 0.01:
+                    continue
+                coordinates = first_coords + second_coords[1:]
+                signature = tuple((round(point[0], 5), round(point[1], 5)) for point in coordinates)
+                if signature in seen:
+                    continue
+                seen.add(signature)
+                distance_meters = first['distance_meters'] + second['distance_meters']
+                duration_seconds = first['duration_seconds'] + second['duration_seconds']
+                route = {
+                    'id': f'route-{len(combinations) + 1}',
+                    'name': f'Route {len(combinations) + 1}',
+                    'geometry': {'type': 'LineString', 'coordinates': coordinates},
+                    'distance_meters': distance_meters,
+                    'duration_seconds': duration_seconds,
+                    'distance_miles': round(distance_meters / 1609.344, 1),
+                    'duration_hours': round(duration_seconds / 3600, 2),
+                    'summary': {
+                        'distance_meters': distance_meters,
+                        'distance_miles': round(distance_meters / 1609.344, 1),
+                        'duration_seconds': duration_seconds,
+                        'duration_hours': round(duration_seconds / 3600, 2),
+                        'profile': profile,
+                    },
+                    'provider_legs': [
+                        {
+                            'distance_meters': first['distance_meters'],
+                            'distance_miles': first['distance_meters'] / 1609.344,
+                            'duration_seconds': first['duration_seconds'],
+                            'waypoint_coordinate': first_coords[-1],
+                        },
+                        {
+                            'distance_meters': second['distance_meters'],
+                            'distance_miles': second['distance_meters'] / 1609.344,
+                            'duration_seconds': second['duration_seconds'],
+                        },
+                    ],
+                    'waypoint_distances_miles': [first['distance_meters'] / 1609.344],
+                }
+                if first.get('segment_durations_seconds') and second.get('segment_durations_seconds'):
+                    route['segment_durations_seconds'] = (
+                        first['segment_durations_seconds'] + second['segment_durations_seconds']
+                    )
+                notes = [note for note in (first.get('alternatives_note'), second.get('alternatives_note')) if note]
+                if notes:
+                    route['alternatives_note'] = ' '.join(dict.fromkeys(notes))
+                combinations.append(route)
+
+        if not combinations:
+            raise ServiceError(
+                'OpenRouteService could not connect both route legs through the pickup.',
+                status_code=502, code='routing_disconnected_legs',
+            )
+        # Keep the three fastest distinct, fully provider-derived combinations.
+        ranked = sorted(combinations, key=lambda route: route['duration_seconds'])[:3]
+        for index, route in enumerate(ranked, start=1):
+            route['id'] = f'route-{index}'
+            route['name'] = f'Route {index}'
+        return ranked
 
     @staticmethod
     def _validate_place(place, name):
